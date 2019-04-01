@@ -24,13 +24,13 @@
 #include "v30mz.h"
 #include "wswan-memory.h"
 
-#include "../include/blip/Blip_Buffer.h"
+#include "Blip_Buffer.h"
 
-static Blip_Synth<blip_good_quality, 256> WaveSynth;
-static Blip_Synth<blip_med_quality, 256> NoiseSynth;
-static Blip_Synth<blip_good_quality, 256 * 15> VoiceSynth;
+static Blip_Synth WaveSynth;
+static Blip_Synth NoiseSynth;
+static Blip_Synth VoiceSynth;
 
-static Blip_Buffer *sbuf[2] = { NULL };
+static Blip_Buffer sbuf[2];
 
 static uint16 period[4];
 static uint8 volume[4]; // left volume in upper 4 bits, right in lower 4 bits
@@ -79,8 +79,8 @@ static uint32 last_ts;
 #define SYNCSAMPLE(wt)	\
    {	\
     int32 left = sample_cache[ch][0], right = sample_cache[ch][1];	\
-    WaveSynth.offset_inline(wt, left - last_val[ch][0], sbuf[0]);	\
-    WaveSynth.offset_inline(wt, right - last_val[ch][1], sbuf[1]);	\
+    Blip_Synth_offset(&WaveSynth, wt, left - last_val[ch][0], &sbuf[0]);	\
+    Blip_Synth_offset(&WaveSynth, wt, right - last_val[ch][1], &sbuf[1]);	\
     last_val[ch][0] = left;	\
     last_val[ch][1] = right;	\
    }
@@ -88,8 +88,8 @@ static uint32 last_ts;
 #define SYNCSAMPLE_NOISE(wt)  \
    {    \
     int32 left = sample_cache[ch][0], right = sample_cache[ch][1];      \
-    NoiseSynth.offset_inline(wt, left - last_val[ch][0], sbuf[0]);      \
-    NoiseSynth.offset_inline(wt, right - last_val[ch][1], sbuf[1]);     \
+    Blip_Synth_offset(&NoiseSynth, wt, left - last_val[ch][0], &sbuf[0]);      \
+    Blip_Synth_offset(&NoiseSynth, wt, right - last_val[ch][1], &sbuf[1]);     \
     last_val[ch][0] = left;     \
     last_val[ch][1] = right;    \
    }
@@ -112,8 +112,8 @@ void WSwan_SoundUpdate(void)
       {
          int32 neoval = (volume[ch] - 0x80) * voice_volume;
 
-         VoiceSynth.offset(v30mz_timestamp, neoval - last_v_val, sbuf[0]);
-         VoiceSynth.offset(v30mz_timestamp, neoval - last_v_val, sbuf[1]);
+         Blip_Synth_offset(&VoiceSynth, v30mz_timestamp, neoval - last_v_val, &sbuf[0]);
+         Blip_Synth_offset(&VoiceSynth, v30mz_timestamp, neoval - last_v_val, &sbuf[1]);
 
          last_v_val = neoval;
       }
@@ -209,8 +209,8 @@ void WSwan_SoundUpdate(void)
 
       if(tmphv - last_hv_val)
       {
-         WaveSynth.offset_inline(v30mz_timestamp, tmphv - last_hv_val, sbuf[0]);
-         WaveSynth.offset_inline(v30mz_timestamp, tmphv - last_hv_val, sbuf[1]);
+         Blip_Synth_offset(&WaveSynth, v30mz_timestamp, tmphv - last_hv_val, &sbuf[0]);
+         Blip_Synth_offset(&WaveSynth, v30mz_timestamp, tmphv - last_hv_val, &sbuf[1]);
          last_hv_val = tmphv;
       }
    }
@@ -327,8 +327,8 @@ int32 WSwan_SoundFlush(int16 *SoundBuf, const int32 MaxSoundFrames)
    {
       for(int y = 0; y < 2; y++)
       {
-         sbuf[y]->end_frame(v30mz_timestamp);
-         FrameCount = sbuf[y]->read_samples(SoundBuf + y, MaxSoundFrames, true);
+			Blip_Buffer_end_frame(&sbuf[y], v30mz_timestamp);
+			FrameCount = Blip_Buffer_read_samples(&sbuf[y], SoundBuf + y, MaxSoundFrames);
       }
    }
 
@@ -346,11 +346,11 @@ void WSwan_SoundCheckRAMWrite(uint32 A)
 
 static void RedoVolume(void)
 {
-   double eff_volume = 1.0 / 4;
+	double eff_volume = 1.0 / 4;
 
-   WaveSynth.volume(eff_volume);
-   NoiseSynth.volume(eff_volume);
-   VoiceSynth.volume(eff_volume);
+	Blip_Synth_set_volume(&WaveSynth, eff_volume, 256);
+	Blip_Synth_set_volume(&NoiseSynth, eff_volume, 256);
+	Blip_Synth_set_volume(&VoiceSynth, eff_volume, 256*15);
 }
 
 void WSwan_SoundInit(void)
@@ -358,11 +358,10 @@ void WSwan_SoundInit(void)
    unsigned i;
    for(i = 0; i < 2; i++)
    {
-      sbuf[i] = new Blip_Buffer();
-
-      sbuf[i]->set_sample_rate(0 ? 0 : 44100, 60);
-      sbuf[i]->clock_rate((long)(3072000));
-      sbuf[i]->bass_freq(20);
+		Blip_Buffer_init(&sbuf[i]);
+		Blip_Buffer_set_sample_rate(&sbuf[i], 44100, 60);
+		Blip_Buffer_set_clock_rate(&sbuf[i], (long)(3072000));
+		Blip_Buffer_bass_freq(&sbuf[i], 20);
    }
 
    RedoVolume();
@@ -372,24 +371,69 @@ void WSwan_SoundKill(void)
 {
    for(int i = 0; i < 2; i++)
    {
-      if(sbuf[i])
-      {
-         delete sbuf[i];
-         sbuf[i] = NULL;
-      }
+	   Blip_Buffer_deinit(&sbuf[i]);
    }
 
 }
 
-bool WSwan_SetSoundRate(uint32 rate)
+uint32_t WSwan_SetSoundRate(uint32 rate)
 {
-   unsigned i;
-   for(i = 0; i < 2; i++)
-      sbuf[i]->set_sample_rate(rate?rate:44100, 60);
+	unsigned i;
+	for(i = 0; i < 2; i++)
+	{
+		Blip_Buffer_set_sample_rate(&sbuf[i], rate ? rate : 44100, 60);
+	}
 
-   return(true);
+	return(true);
 }
 
+void WSwan_SoundSaveState(uint32_t load, FILE* fp)
+{
+	if (load == 1)
+	{
+		fread(&period, sizeof(uint8_t), sizeof(period), fp);
+		fread(&volume, sizeof(uint8_t), sizeof(volume), fp);
+		fread(&voice_volume, sizeof(uint8_t), sizeof(voice_volume), fp);
+		
+		fread(&sweep_step, sizeof(uint8_t), sizeof(sweep_step), fp);
+		fread(&sweep_value, sizeof(uint8_t), sizeof(sweep_value), fp);
+		fread(&noise_control, sizeof(uint8_t), sizeof(noise_control), fp);
+		
+		fread(&control, sizeof(uint8_t), sizeof(control), fp);
+		fread(&output_control, sizeof(uint8_t), sizeof(output_control), fp);
+		fread(&noise_control, sizeof(uint8_t), sizeof(noise_control), fp);
+		
+		fread(&sweep_8192_divider, sizeof(uint8_t), sizeof(sweep_8192_divider), fp);
+		fread(&sweep_counter, sizeof(uint8_t), sizeof(sweep_counter), fp);
+		fread(&SampleRAMPos, sizeof(uint8_t), sizeof(SampleRAMPos), fp);
+		fread(&period_counter, sizeof(uint8_t), sizeof(period_counter), fp);
+		fread(&sample_pos, sizeof(uint8_t), sizeof(sample_pos), fp);
+		fread(&nreg, sizeof(uint8_t), sizeof(nreg), fp);
+	}
+	else
+	{
+		fwrite(&period, sizeof(uint8_t), sizeof(period), fp);
+		fwrite(&volume, sizeof(uint8_t), sizeof(volume), fp);
+		fwrite(&voice_volume, sizeof(uint8_t), sizeof(voice_volume), fp);
+		
+		fwrite(&sweep_step, sizeof(uint8_t), sizeof(sweep_step), fp);
+		fwrite(&sweep_value, sizeof(uint8_t), sizeof(sweep_value), fp);
+		fwrite(&noise_control, sizeof(uint8_t), sizeof(noise_control), fp);
+		
+		fwrite(&control, sizeof(uint8_t), sizeof(control), fp);
+		fwrite(&output_control, sizeof(uint8_t), sizeof(output_control), fp);
+		fwrite(&noise_control, sizeof(uint8_t), sizeof(noise_control), fp);
+		
+		fwrite(&sweep_8192_divider, sizeof(uint8_t), sizeof(sweep_8192_divider), fp);
+		fwrite(&sweep_counter, sizeof(uint8_t), sizeof(sweep_counter), fp);
+		fwrite(&SampleRAMPos, sizeof(uint8_t), sizeof(SampleRAMPos), fp);
+		fwrite(&period_counter, sizeof(uint8_t), sizeof(period_counter), fp);
+		fwrite(&sample_pos, sizeof(uint8_t), sizeof(sample_pos), fp);
+		fwrite(&nreg, sizeof(uint8_t), sizeof(nreg), fp);
+	}
+}
+
+/*
 int WSwan_SoundStateAction(StateMem *sm, int load, int data_only)
 {
  SFORMAT StateRegs[] =
@@ -416,7 +460,7 @@ int WSwan_SoundStateAction(StateMem *sm, int load, int data_only)
   return(0);
 
  return(1);
-}
+}*/
 
 void WSwan_SoundReset(void)
 {
@@ -445,6 +489,8 @@ void WSwan_SoundReset(void)
    HyperVoice = 0;
    last_hv_val = 0;
 
-   for(y = 0; y < 2; y++)
-      sbuf[y]->clear();
+	for (y = 0; y < 2; y++)
+	{
+		Blip_Buffer_clear(&sbuf[y], 1);
+	}
 }

@@ -25,37 +25,37 @@
 #include "rtc.h"
 #include "../video.h"
 
-static uint32 wsMonoPal[16][4];
-static uint32 wsColors[8];
-static uint32 wsCols[16][16];
+static uint32_t wsMonoPal[16][4];
+static uint32_t wsColors[8];
+static uint32_t wsCols[16][16];
 
-static uint16 ColorMapG[16];
-static uint16 ColorMap[4096];
-static uint32 LayerEnabled;
+static uint16_t ColorMapG[16];
+static uint16_t ColorMap[4096];
+static uint32_t LayerEnabled;
 
-static uint8 wsLine;                 /*current scanline*/
+static uint8_t wsLine;                 /*current scanline*/
 
-static uint8 SpriteTable[0x80][4];
-static uint32 SpriteCountCache;
-static uint8 DispControl;
-static uint8 BGColor;
-static uint8 LineCompare;
-static uint8 SPRBase;
-static uint8 SpriteStart, SpriteCount;
-static uint8 FGBGLoc;
-static uint8 FGx0, FGy0, FGx1, FGy1;
-static uint8 SPRx0, SPRy0, SPRx1, SPRy1;
+static uint8_t SpriteTable[0x80][4];
+static uint32_t SpriteCountCache;
+static uint8_t DispControl;
+static uint8_t BGColor;
+static uint8_t LineCompare;
+static uint8_t SPRBase;
+static uint8_t SpriteStart, SpriteCount;
+static uint8_t FGBGLoc;
+static uint8_t FGx0, FGy0, FGx1, FGy1;
+static uint8_t SPRx0, SPRy0, SPRx1, SPRy1;
 
-static uint8 BGXScroll, BGYScroll;
-static uint8 FGXScroll, FGYScroll;
-static uint8 LCDControl, LCDIcons;
+static uint8_t BGXScroll, BGYScroll;
+static uint8_t FGXScroll, FGYScroll;
+static uint8_t LCDControl, LCDIcons;
 
-static uint8 BTimerControl;
-static uint16 HBTimerPeriod;
-static uint16 VBTimerPeriod;
+static uint8_t BTimerControl;
+static uint16_t HBTimerPeriod;
+static uint16_t VBTimerPeriod;
 
-static uint16 HBCounter, VBCounter;
-static uint8 VideoMode;
+static uint16_t HBCounter, VBCounter;
+static uint8_t VideoMode;
 
 void WSwan_GfxInit(void)
 {
@@ -64,8 +64,8 @@ void WSwan_GfxInit(void)
 
 void WSwan_GfxWSCPaletteRAMWrite(uint32 ws_offset, uint8 data)
 {
-   ws_offset=(ws_offset&0xfffe)-0xfe00;
-   wsCols[(ws_offset>>1)>>4][(ws_offset>>1)&15] = wsRAM[ws_offset+0xfe00] | ((wsRAM[ws_offset+0xfe01]&0x0f) << 8);
+	ws_offset = (ws_offset&0xfffe)-0xfe00;
+	wsCols[(ws_offset>>1)>>4][(ws_offset>>1)&15] = wsRAM[ws_offset+0xfe00] | ((wsRAM[ws_offset+0xfe01]&0x0f) << 8);
 }
 
 void WSwan_GfxWrite(uint32 A, uint8 V)
@@ -264,9 +264,9 @@ uint8 WSwan_GfxRead(uint32 A)
    return 0;
 }
 
-bool wsExecuteLine(MDFN_Surface *surface, bool skip)
+uint32_t wsExecuteLine(MDFN_Surface *surface, uint32_t skip)
 {
-   bool ret = false;
+   uint32_t ret = false;
 
    if(wsLine < 144)
    {
@@ -418,7 +418,7 @@ void wsScanline(uint16 *target)
    if((DispControl & 0x02) && (LayerEnabled & 0x02))/*FG layer*/
    {
       uint8 windowtype = DispControl&0x30;
-      bool in_window[256 + 8*2];
+      uint32_t in_window[256 + 8*2];
 
       if(windowtype)
       {
@@ -497,7 +497,7 @@ void wsScanline(uint16 *target)
    if((DispControl & 0x04) && SpriteCountCache && (LayerEnabled & 0x04))/*Sprites*/
    {
       int xs,ts,as,ys,ysx,h;
-      bool in_window[256 + 8*2];
+      uint32_t in_window[256 + 8*2];
 
       if(DispControl & 0x08)
       {
@@ -541,7 +541,7 @@ void wsScanline(uint16 *target)
                      {
                         if((as & 0x20) || !(b_bg[xs + x + 7] & 0x10))
                         {
-                           bool drawthis = 0;
+                           uint32_t drawthis = 0;
 
                            if(!(DispControl & 0x08)) 
                               drawthis = true;
@@ -565,7 +565,7 @@ void wsScanline(uint16 *target)
                      {
                         if((as & 0x20) || !(b_bg[xs + x + 7] & 0x10))
                         {
-                           bool drawthis = 0;
+                           uint32_t drawthis = 0;
 
                            if(!(DispControl & 0x08))
                               drawthis = true;
@@ -592,7 +592,7 @@ void wsScanline(uint16 *target)
                   {
                      if((as & 0x20) || !(b_bg[xs + x + 7] & 0x10))
                      {
-                        bool drawthis = 0;
+                        uint32_t drawthis = 0;
 
                         if(!(DispControl & 0x08))
                            drawthis = true;
@@ -674,60 +674,100 @@ void WSwan_GfxReset(void)
 
 }
 
-int WSwan_GfxStateAction(StateMem *sm, int load, int data_only)
+void WSwan_GfxSaveState(uint32_t load, FILE* fp)
 {
-   SFORMAT StateRegs[] =
-   {
-      SFARRAY32N(&wsMonoPal[0][0], 16 * 4, "wsMonoPal"),
-      SFARRAY32(wsColors, 8),
+	/* Load state */
+	if (load == 1)
+	{
+		fread(&wsMonoPal, sizeof(uint8_t), sizeof(wsMonoPal), fp);
+		fread(&wsColors, sizeof(uint8_t), sizeof(wsColors), fp);
+		fread(&wsCols, sizeof(uint8_t), sizeof(wsCols), fp);
 
-      SFVAR(wsLine),
+		fread(&ColorMapG, sizeof(uint8_t), sizeof(ColorMapG), fp);
+		fread(&ColorMap, sizeof(uint8_t), sizeof(ColorMap), fp);
+		fread(&LayerEnabled, sizeof(uint8_t), sizeof(LayerEnabled), fp);
 
-      SFARRAYN(&SpriteTable[0][0], 0x80 * 4, "SpriteTable"),
-      SFVAR(SpriteCountCache),
-      SFVAR(DispControl),
-      SFVAR(BGColor),
-      SFVAR(LineCompare),
-      SFVAR(SPRBase),
-      SFVAR(SpriteStart),
-      SFVAR(SpriteCount),
-      SFVAR(FGBGLoc),
-      SFVAR(FGx0),
-      SFVAR(FGy0),
-      SFVAR(FGx1),
-      SFVAR(FGy1),
+		fread(&wsLine, sizeof(uint8_t), sizeof(wsLine), fp);
 
-      SFVAR(SPRx0),
-      SFVAR(SPRy0),
+		fread(&SpriteTable, sizeof(uint8_t), sizeof(SpriteTable), fp);
+		fread(&SpriteCountCache, sizeof(uint8_t), sizeof(SpriteCountCache), fp);
+		fread(&DispControl, sizeof(uint8_t), sizeof(DispControl), fp);
+		fread(&BGColor, sizeof(uint8_t), sizeof(BGColor), fp);
+		fread(&LineCompare, sizeof(uint8_t), sizeof(LineCompare), fp);
+		fread(&SPRBase, sizeof(uint8_t), sizeof(SPRBase), fp);
+		fread(&SpriteStart, sizeof(uint8_t), sizeof(SpriteStart), fp);
+		fread(&SpriteCount, sizeof(uint8_t), sizeof(SpriteCount), fp);
+		fread(&FGBGLoc, sizeof(uint8_t), sizeof(FGBGLoc), fp);
+		fread(&FGx0, sizeof(uint8_t), sizeof(FGx0), fp);
+		fread(&FGy0, sizeof(uint8_t), sizeof(FGy0), fp);
+		fread(&FGx1, sizeof(uint8_t), sizeof(FGx1), fp);
+		fread(&FGy1, sizeof(uint8_t), sizeof(FGy1), fp);
+		fread(&SPRx0, sizeof(uint8_t), sizeof(SPRx0), fp);
+		fread(&SPRy0, sizeof(uint8_t), sizeof(SPRy0), fp);
+		fread(&SPRx1, sizeof(uint8_t), sizeof(SPRx1), fp);
+		fread(&SPRy1, sizeof(uint8_t), sizeof(SPRy1), fp);
 
-      SFVAR(SPRx1),
-      SFVAR(SPRy1),
+		fread(&BGXScroll, sizeof(uint8_t), sizeof(BGXScroll), fp);
+		fread(&BGYScroll, sizeof(uint8_t), sizeof(BGYScroll), fp);
+		fread(&FGXScroll, sizeof(uint8_t), sizeof(FGXScroll), fp);
+		fread(&FGYScroll, sizeof(uint8_t), sizeof(FGYScroll), fp);
+		fread(&LCDControl, sizeof(uint8_t), sizeof(LCDControl), fp);
+		fread(&LCDIcons, sizeof(uint8_t), sizeof(LCDIcons), fp);
 
-      SFVAR(BGXScroll),
-      SFVAR(BGYScroll),
-      SFVAR(FGXScroll),
-      SFVAR(FGYScroll),
-      SFVAR(LCDControl),
-      SFVAR(LCDIcons),
+		fread(&BTimerControl, sizeof(uint8_t), sizeof(BTimerControl), fp);
+		fread(&HBTimerPeriod, sizeof(uint8_t), sizeof(HBTimerPeriod), fp);
+		fread(&VBTimerPeriod, sizeof(uint8_t), sizeof(VBTimerPeriod), fp);
 
-      SFVAR(BTimerControl),
-      SFVAR(HBTimerPeriod),
-      SFVAR(VBTimerPeriod),
+		fread(&HBCounter, sizeof(uint8_t), sizeof(HBCounter), fp);
+		fread(&VBCounter, sizeof(uint8_t), sizeof(VBCounter), fp);
+		fread(&VideoMode, sizeof(uint8_t), sizeof(VideoMode), fp);
+		
+		wsSetVideo(VideoMode >> 5, true);
+	}
+	/* Save State */
+	else
+	{
+		fwrite(&wsMonoPal, sizeof(uint8_t), sizeof(wsMonoPal), fp);
+		fwrite(&wsColors, sizeof(uint8_t), sizeof(wsColors), fp);
+		fwrite(&wsCols, sizeof(uint8_t), sizeof(wsCols), fp);
 
-      SFVAR(HBCounter),
-      SFVAR(VBCounter),
+		fwrite(&ColorMapG, sizeof(uint8_t), sizeof(ColorMapG), fp);
+		fwrite(&ColorMap, sizeof(uint8_t), sizeof(ColorMap), fp);
+		fwrite(&LayerEnabled, sizeof(uint8_t), sizeof(LayerEnabled), fp);
 
-      SFVAR(VideoMode),
-      SFEND
-   };
+		fwrite(&wsLine, sizeof(uint8_t), sizeof(wsLine), fp);
 
-   if(!MDFNSS_StateAction(sm, load, data_only, StateRegs, "GFX", false))
-      return(0);
+		fwrite(&SpriteTable, sizeof(uint8_t), sizeof(SpriteTable), fp);
+		fwrite(&SpriteCountCache, sizeof(uint8_t), sizeof(SpriteCountCache), fp);
+		fwrite(&DispControl, sizeof(uint8_t), sizeof(DispControl), fp);
+		fwrite(&BGColor, sizeof(uint8_t), sizeof(BGColor), fp);
+		fwrite(&LineCompare, sizeof(uint8_t), sizeof(LineCompare), fp);
+		fwrite(&SPRBase, sizeof(uint8_t), sizeof(SPRBase), fp);
+		fwrite(&SpriteStart, sizeof(uint8_t), sizeof(SpriteStart), fp);
+		fwrite(&SpriteCount, sizeof(uint8_t), sizeof(SpriteCount), fp);
+		fwrite(&FGBGLoc, sizeof(uint8_t), sizeof(FGBGLoc), fp);
+		fwrite(&FGx0, sizeof(uint8_t), sizeof(FGx0), fp);
+		fwrite(&FGy0, sizeof(uint8_t), sizeof(FGy0), fp);
+		fwrite(&FGx1, sizeof(uint8_t), sizeof(FGx1), fp);
+		fwrite(&FGy1, sizeof(uint8_t), sizeof(FGy1), fp);
+		fwrite(&SPRx0, sizeof(uint8_t), sizeof(SPRx0), fp);
+		fwrite(&SPRy0, sizeof(uint8_t), sizeof(SPRy0), fp);
+		fwrite(&SPRx1, sizeof(uint8_t), sizeof(SPRx1), fp);
+		fwrite(&SPRy1, sizeof(uint8_t), sizeof(SPRy1), fp);
 
-   if(load)
-   {
-      wsSetVideo(VideoMode >> 5, true);
-   }
+		fwrite(&BGXScroll, sizeof(uint8_t), sizeof(BGXScroll), fp);
+		fwrite(&BGYScroll, sizeof(uint8_t), sizeof(BGYScroll), fp);
+		fwrite(&FGXScroll, sizeof(uint8_t), sizeof(FGXScroll), fp);
+		fwrite(&FGYScroll, sizeof(uint8_t), sizeof(FGYScroll), fp);
+		fwrite(&LCDControl, sizeof(uint8_t), sizeof(LCDControl), fp);
+		fwrite(&LCDIcons, sizeof(uint8_t), sizeof(LCDIcons), fp);
 
-   return(1);
+		fwrite(&BTimerControl, sizeof(uint8_t), sizeof(BTimerControl), fp);
+		fwrite(&HBTimerPeriod, sizeof(uint8_t), sizeof(HBTimerPeriod), fp);
+		fwrite(&VBTimerPeriod, sizeof(uint8_t), sizeof(VBTimerPeriod), fp);
+
+		fwrite(&HBCounter, sizeof(uint8_t), sizeof(HBCounter), fp);
+		fwrite(&VBCounter, sizeof(uint8_t), sizeof(VBCounter), fp);
+		fwrite(&VideoMode, sizeof(uint8_t), sizeof(VideoMode), fp);
+	}
 }

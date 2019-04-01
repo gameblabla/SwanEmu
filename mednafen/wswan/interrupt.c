@@ -2,13 +2,13 @@
 #include "interrupt.h"
 #include "v30mz.h"
 
-static uint8 IStatus;
-static uint8 IEnable;
-static uint8 IVectorBase;
+static uint8_t IStatus;
+static uint8_t IEnable;
+static uint8_t IVectorBase;
 
-static bool IOn_Cache;
-static uint32 IOn_Which;
-static uint32 IVector_Cache;
+static uint32_t IOn_Cache;
+static uint32_t IOn_Which;
+static uint32_t IVector_Cache;
 
 static void RecalcInterrupt(void)
 {
@@ -89,60 +89,18 @@ void WSwan_InterruptReset(void)
    RecalcInterrupt();
 }
 
-#ifdef WANT_DEBUGGER
-static const char *PrettyINames[8] = { "Serial Send", "Key Press", "RTC Alarm", "Serial Recv", "Line Hit", "VBlank Timer", "VBlank", "HBlank Timer" };
-
-uint32 WSwan_InterruptGetRegister(const unsigned int id, char *special, const uint32 special_len)
+void WSwan_InterruptSaveState(uint32_t load, FILE* fp)
 {
-   switch(id)
-   {
-      case INT_GSREG_ISTATUS:
-         return IStatus;
-      case INT_GSREG_IENABLE:
-         return IEnable;
-      case INT_GSREG_IVECTORBASE:
-         return IVectorBase;
-   }
-
-   return 0;
-}
-
-void WSwan_InterruptSetRegister(const unsigned int id, uint32 value)
-{
-   switch(id)
-   {
-      case INT_GSREG_ISTATUS:
-         IStatus = value;
-         break;
-
-      case INT_GSREG_IENABLE:
-         IEnable = value;
-         break;
-
-      case INT_GSREG_IVECTORBASE:
-         IVectorBase = value;
-         break;
-   }
-
-   RecalcInterrupt();
-}
-#endif
-
-int WSwan_InterruptStateAction(StateMem *sm, int load, int data_only)
-{
-   SFORMAT StateRegs[] =
-   {
-      SFVAR(IStatus),
-      SFVAR(IEnable),
-      SFVAR(IVectorBase),
-      SFEND
-   };
-
-   if(!MDFNSS_StateAction(sm, load, data_only, StateRegs, "INTR", false))
-      return(0);
-
-   if(load)
-      RecalcInterrupt();
-
-   return(1);
+	if (load == 1)
+	{
+		fread(&IStatus, sizeof(uint8_t), sizeof(IStatus), fp);
+		fread(&IEnable, sizeof(uint8_t), sizeof(IEnable), fp);
+		fread(&IVectorBase, sizeof(uint8_t), sizeof(IVectorBase), fp);
+	}
+	else
+	{
+		fwrite(&IStatus, sizeof(uint8_t), sizeof(IStatus), fp);
+		fwrite(&IEnable, sizeof(uint8_t), sizeof(IEnable), fp);
+		fwrite(&IVectorBase, sizeof(uint8_t), sizeof(IVectorBase), fp);
+	}
 }

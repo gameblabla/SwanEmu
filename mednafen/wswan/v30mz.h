@@ -33,14 +33,9 @@ unsigned v30mz_get_reg(int regnum);
 void v30mz_reset(void);
 void v30mz_init(uint8 (*readmem20)(uint32), void (*writemem20)(uint32,uint8), uint8 (*readport)(uint32), void (*writeport)(uint32, uint8));
 
-void v30mz_int(uint32 vector, bool IgnoreIF = false);
+void v30mz_int(uint32 vector, uint32_t IgnoreIF);
 
-int v30mz_StateAction(StateMem *sm, int load, int data_only);
+void WSwan_v30mzSaveState(uint32_t load, FILE* fp);
 
-
-#ifdef WANT_DEBUGGER
-void v30mz_debug(void (*CPUHook)(uint32), uint8 (*ReadHook)(uint32), void (*WriteHook)(uint32, uint8), uint8 (*PortReadHook)(uint32), void (*PortWriteHook)(uint32, uint8),
-			void (*BranchTraceHook)(uint16 from_CS, uint16 from_IP, uint16 to_CS, uint16 to_IP, bool interrupt) );
-#endif
 
 #endif

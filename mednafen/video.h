@@ -29,10 +29,6 @@
 #define MAKECOLOR(r, g, b, a) (((r >> RED_EXPAND) << RED_SHIFT) | ((g >> GREEN_EXPAND) << GREEN_SHIFT) | ((b >> BLUE_EXPAND) << BLUE_SHIFT))
 #endif
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 typedef struct
 {
  int32_t x, y, w, h;
@@ -55,8 +51,5 @@ typedef struct
    int32_t pitch;
 } MDFN_Surface;
 
-#ifdef __cplusplus
-}
-#endif
 
 #endif

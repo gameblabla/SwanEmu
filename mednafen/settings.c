@@ -21,47 +21,84 @@
 
 uint64 MDFN_GetSettingUI(const char *name)
 {
-   if (!strcmp("wswan.ocmultiplier", name))
-      return 1;
-   if (!strcmp("wswan.bday", name))
-      return 23;
-   if (!strcmp("wswan.bmonth", name))
-      return 6;
-   if (!strcmp("wswan.byear", name))
-      return 1989;
-   if (!strcmp("wswan.slstart", name))
-      return 4;
-   if (!strcmp("wswan.slend", name))
-      return 235;
+	
+	if (!strcmp("wswan.ocmultiplier", name))
+	{
+		return 1;
+	}
+	
+	if (!strcmp("wswan.bday", name))
+	{
+		return 23;
+	}
+	
+	if (!strcmp("wswan.bmonth", name))
+	{
+		return 6;
+	}
+	
+	if (!strcmp("wswan.byear", name))
+	{
+		return 1989;
+	}
+	
+	if (!strcmp("wswan.slstart", name))
+	{
+		return 4;
+	}
+	
+	if (!strcmp("wswan.slend", name))
+	{
+		return 235;
+	}
 
-   return 0;
+	return 0;
 }
 
 int64 MDFN_GetSettingI(const char *name)
 {
-   if (!strcmp("wswan.sex", name))
-      return 0;
-   if (!strcmp("wswan.blood", name))
-      return 0;
-   return 0;
+	
+	if (!strcmp("wswan.sex", name))
+	{
+		return 0;
+	}
+	
+	if (!strcmp("wswan.blood", name))
+	{
+		return 0;
+	}
+	
+	return 0;
 }
 
-bool MDFN_GetSettingB(const char *name)
+uint32_t MDFN_GetSettingB(const char *name)
 {
-   if (!strcmp("cheats", name))
-      return 0;
-   if (!strcmp("wswan.forcemono", name))
-      return 0;
-   if (!strcmp("wswan.language", name))
-      return 1;
-   if (!strcmp("wswan.correct_aspect", name))
-      return 1;
-   return 0;
+	
+	if (!strcmp("wswan.forcemono", name))
+	{
+		return 0;
+	}
+	
+	if (!strcmp("wswan.language", name))
+	{
+		return 1;
+	}
+	
+	if (!strcmp("wswan.correct_aspect", name))
+	{
+		return 1;
+    }
+    
+	return 0;
 }
 
 const char *MDFN_GetSettingS(const char *name)
 {
-   if (!strcmp("wswan.name", name))
-      return "Mednafen";
-   return "";
+	
+	if (!strcmp("wswan.name", name))
+	{
+		return "Mednafen";
+	}
+	
+	return "";
 }

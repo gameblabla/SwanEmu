@@ -237,21 +237,25 @@ void WSwan_EEPROMInit(const char *Name, const uint16_t BYear, const uint8_t BMon
    iEEPROM[0x375] = Blood;
 }
 
-int WSwan_EEPROMStateAction(StateMem *sm, int load, int data_only)
+void WSwan_EEPROMSaveState(uint32_t load, FILE* fp)
 {
-   SFORMAT StateRegs[] =
-   {
-      SFVAR(iEEPROM_Command),
-      SFVAR(iEEPROM_Address),
-      SFVAR(EEPROM_Command),
-      SFVAR(EEPROM_Address),
-      SFARRAY(iEEPROM, sizeof(iEEPROM)),
-      SFARRAYN(eeprom_size ? wsEEPROM : NULL, eeprom_size, "EEPROM"),
-      SFEND
-   };
+	if (load == 1)
+	{
+		fread(&iEEPROM_Command, sizeof(uint8_t), sizeof(iEEPROM_Command), fp);
+		fread(&iEEPROM_Address, sizeof(uint8_t), sizeof(iEEPROM_Address), fp);
+		fread(&EEPROM_Command, sizeof(uint8_t), sizeof(EEPROM_Command), fp);
+		fread(&EEPROM_Address, sizeof(uint8_t), sizeof(EEPROM_Address), fp);
+		fread(&iEEPROM, sizeof(uint8_t), sizeof(iEEPROM), fp);
+		fread(&wsEEPROM, sizeof(uint8_t), eeprom_size, fp);
+	}
+	else
+	{
+		fwrite(&iEEPROM_Command, sizeof(uint8_t), sizeof(iEEPROM_Command), fp);
+		fwrite(&iEEPROM_Address, sizeof(uint8_t), sizeof(iEEPROM_Address), fp);
+		fwrite(&EEPROM_Command, sizeof(uint8_t), sizeof(EEPROM_Command), fp);
+		fwrite(&EEPROM_Address, sizeof(uint8_t), sizeof(EEPROM_Address), fp);
+		fwrite(&iEEPROM, sizeof(uint8_t), sizeof(iEEPROM), fp);
+		fwrite(&wsEEPROM, sizeof(uint8_t), eeprom_size, fp);	
+	}
 
-   if(!MDFNSS_StateAction(sm, load, data_only, StateRegs, "EEPR", false))
-      return(0);
-
-   return(1);
 }

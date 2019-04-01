@@ -5,6 +5,6 @@
 
 uint64 MDFN_GetSettingUI(const char *name);
 int64 MDFN_GetSettingI(const char *name);
-bool MDFN_GetSettingB(const char *name);
+uint32_t MDFN_GetSettingB(const char *name);
 const char *MDFN_GetSettingS(const char *name);
 #endif

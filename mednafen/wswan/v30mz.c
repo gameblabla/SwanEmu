@@ -13,14 +13,13 @@
 
 ****************************************************************************/
 
-/* This NEC V30MZ emulator may be used for purposes both commercial and noncommercial if you give the author, Bryan McPhail, 
-   a small credit somewhere(such as in the documentation for an executable package).
+/* 
+	This NEC V30MZ emulator may be used for purposes both commercial and noncommercial if you give the author, Bryan McPhail, 
+	a small credit somewhere(such as in the documentation for an executable package).
 */
 
 /*
- TODO:
-	Implement bus lock fully(prevent interrupts from occuring during a REP sequence, I think...), taking into account
-		HLT emulation to prevent deadlocks!
+	TODO: Implement bus lock fully(prevent interrupts from occuring during a REP sequence, I think...), taking into account HLT emulation to prevent deadlocks!
 	
 	Implement better prefix emulation.  It's extremely kludgey right now.
 
@@ -34,209 +33,196 @@
 
 #include "v30mz.h"
 #include "v30mz-private.h"
-#include "debug.h"
 
-static uint16 old_CS, old_IP;
+static uint16_t old_CS, old_IP;
 
 #define PUSH(val) \
 { \
-   I.regs.w[SP] -= 2; \
-   WriteWord((((I.sregs[SS]<<4)+I.regs.w[SP])),val); \
+	I.regs.w[SP] -= 2; \
+	WriteWord((((I.sregs[SS]<<4)+I.regs.w[SP])),val); \
 }
 
 #define POP(var) \
 { \
-   var = ReadWord((((I.sregs[SS]<<4)+I.regs.w[SP]))); \
-   I.regs.w[SP]+=2; \
+	var = ReadWord((((I.sregs[SS]<<4)+I.regs.w[SP]))); \
+	I.regs.w[SP]+=2; \
 }
 
-#ifdef WANT_DEBUGGER
- #define ADDBRANCHTRACE(x,y) { if(branch_trace_hook) branch_trace_hook(old_CS, old_IP, x, y, false); }
- #define ADDBRANCHTRACE_INT(x,y) { if(branch_trace_hook) branch_trace_hook(old_CS, old_IP, x,y, true); }
- #define SETOLDCSIP() { old_CS = I.sregs[PS]; old_IP = I.pc; }
-#else
- #define ADDBRANCHTRACE(x,y)	{ }
- #define ADDBRANCHTRACE_INT(x,y)	{ }
- #define SETOLDCSIP() {  }
-#endif
+// Debugger
+#define ADDBRANCHTRACE(x,y)	{ }
+#define ADDBRANCHTRACE_INT(x,y)	{ }
+#define SETOLDCSIP() {  }
 
 typedef union
 {                   /* eight general registers */
-   uint16 w[8];    /* viewed as 16 bits registers */
-   uint8  b[16];   /* or as 8 bit registers */
+   uint16_t w[8];    /* viewed as 16 bits registers */
+   uint8_t  b[16];   /* or as 8 bit registers */
 } v30mz_basicregs_t;
 
 typedef struct
 {
    v30mz_basicregs_t regs;
-   uint16	sregs[4];
+   uint16_t	sregs[4];
 
-   uint16	pc;
+   uint16_t	pc;
 
-   int32	SignVal;
-   uint32  AuxVal, OverVal, ZeroVal, CarryVal, ParityVal; /* 0 or non-0 valued flags */
-   uint8 TF, IF, DF;
+   int32_t	SignVal;
+   uint32_t  AuxVal, OverVal, ZeroVal, CarryVal, ParityVal; /* 0 or non-0 valued flags */
+   uint8_t TF, IF, DF;
 } v30mz_regs_t;
 
-static void (*cpu_writemem20)(uint32,uint8) = NULL;
-static uint8 (*cpu_readport)(uint32) = NULL;
-static void (*cpu_writeport)(uint32, uint8) = NULL;
-static uint8 (*cpu_readmem20)(uint32) = NULL;
+static void (*cpu_writemem20)(uint32_t,uint8_t) = NULL;
+static uint8_t (*cpu_readport)(uint32_t) = NULL;
+static void (*cpu_writeport)(uint32_t, uint8_t) = NULL;
+static uint8_t (*cpu_readmem20)(uint32_t) = NULL;
 
 /***************************************************************************/
 /* cpu state                                                               */
 /***************************************************************************/
 
-uint32 v30mz_timestamp;
-int32 v30mz_ICount;
+uint32_t v30mz_timestamp;
+int32_t v30mz_ICount;
 
 static v30mz_regs_t I;
-static bool InHLT;
+static uint32_t InHLT;
 
-static uint32 prefix_base;	/* base address of the latest prefix segment */
-static char seg_prefix;		/* prefix segment indicator */
+/* Base address of the latest prefix segment */
+static uint32_t prefix_base;	
 
-#ifdef WANT_DEBUGGER
-static void (*cpu_hook)(uint32) = NULL;
-static uint8 (*read_hook)(uint32) = NULL;
-static void (*write_hook)(uint32, uint8) = NULL;
-static uint8 (*port_read_hook)(uint32) = NULL;
-static void (*port_write_hook)(uint32, uint8) = NULL;
-static bool hookie_hickey = 0;
-static void (*branch_trace_hook)(uint16 from_CS, uint16 from_IP, uint16 to_CS, uint16 to_IP, bool interrupt) = NULL;
-#endif
+/* Prefix segment indicator */
+static char seg_prefix;
 
 #include "v30mz-ea.inc"
 #include "v30mz-modrm.inc"
 
-static uint8 parity_table[256];
+static uint8_t parity_table[256];
 
 static INLINE void i_real_pushf(void)
 {
-   uint16 compr = CompressFlags();
-   PUSH(compr); 
-   CLK(2);
+	uint16_t compr = CompressFlags();
+	PUSH(compr); 
+	CLK(2);
 }
 
 static INLINE void i_real_popf(void)
 {
-   uint32 tmp; 
-   POP(tmp); 
-   ExpandFlags(tmp); 
-   CLK(3);
+	uint32_t tmp; 
+	POP(tmp); 
+	ExpandFlags(tmp); 
+	CLK(3);
 }
 
 /***************************************************************************/
 
 void v30mz_init(uint8 (*readmem20)(uint32), void (*writemem20)(uint32,uint8), uint8 (*readport)(uint32), void (*writeport)(uint32, uint8))
 {
-   cpu_readmem20 = readmem20;
-   cpu_writemem20 = writemem20;
+	cpu_readmem20 = readmem20;
+	cpu_writemem20 = writemem20;
 
-   cpu_readport = readport;
-   cpu_writeport = writeport;
+	cpu_readport = readport;
+	cpu_writeport = writeport;
 }
 
 void v30mz_reset(void)
 {
-   unsigned i;
-   const BREGS reg_name[8] = { AL, CL, DL, BL, AH, CH, DH, BH };
+	unsigned i;
+	const BREGS reg_name[8] = { AL, CL, DL, BL, AH, CH, DH, BH };
 
-   v30mz_ICount = 0;
-   v30mz_timestamp = 0;
+	v30mz_ICount = 0;
+	v30mz_timestamp = 0;
 
-   memset(&I, 0, sizeof(I));
+	memset(&I, 0, sizeof(I));
 
-   I.sregs[PS] = 0xffff;
+	I.sregs[PS] = 0xffff;
 
-   for(i = 0; i < 256; i++)
-   {
-      unsigned j;
-      unsigned int c = 0;
+	for (i = 0; i < 256; i++)
+	{
+		unsigned j;
+		unsigned int c = 0;
 
-      for (j = i; j > 0; j >>= 1)
-         if (j & 1) c++;
+		for (j = i; j > 0; j >>= 1)
+			if (j & 1) c++;
 
-      parity_table[i] = !(c & 1);
-   }
+		parity_table[i] = !(c & 1);
+	}
 
-   I.ZeroVal = I.ParityVal = 1;
+	I.ZeroVal = I.ParityVal = 1;
 
-   for(i = 0; i < 256; i++)
-   {
-      Mod_RM.reg.b[i] = reg_name[(i & 0x38) >> 3];
-      Mod_RM.reg.w[i] = (WREGS) ( (i & 0x38) >> 3) ;
-   }
+	for(i = 0; i < 256; i++)
+	{
+		Mod_RM.reg.b[i] = reg_name[(i & 0x38) >> 3];
+		Mod_RM.reg.w[i] = (WREGS) ( (i & 0x38) >> 3) ;
+	}
 
-   for(i = 0xc0; i < 0x100; i++)
-   {
-      Mod_RM.RM.w[i] = (WREGS)( i & 7 );
-      Mod_RM.RM.b[i] = (BREGS)reg_name[i & 7];
-   }
+	for(i = 0xc0; i < 0x100; i++)
+	{
+		Mod_RM.RM.w[i] = (WREGS)( i & 7 );
+		Mod_RM.RM.b[i] = (BREGS)reg_name[i & 7];
+	}
 
-   prefix_base = 0;
-   seg_prefix = 0;
-   InHLT = 0;
+	prefix_base = 0;
+	seg_prefix = 0;
+	InHLT = 0;
 }
 
-void v30mz_int(uint32 vector, bool IgnoreIF)
+void v30mz_int(uint32_t vector, uint32_t IgnoreIF)
 {
-   InHLT = false; // This is correct!  Standby mode is always exited when there is an INT signal, regardless of whether interrupt are disabled.
-   if(I.IF || IgnoreIF)
-   {
-      uint32 dest_seg, dest_off;
-      uint16 compr = CompressFlags();
+	InHLT = false; // This is correct!  Standby mode is always exited when there is an INT signal, regardless of whether interrupt are disabled.
+	if(I.IF || IgnoreIF)
+	{
+		uint32_t dest_seg, dest_off;
+		uint16_t compr = CompressFlags();
 
-      PUSH( compr );
-      I.TF = I.IF = 0;
-      dest_off = ReadWord(vector);
-      dest_seg = ReadWord(vector+2);
-      PUSH(I.sregs[PS]);
-      PUSH(I.pc);
-      I.pc = (uint16)dest_off;
-      I.sregs[PS] = (uint16)dest_seg;
-      ADDBRANCHTRACE_INT(I.sregs[PS], I.pc);
-      CLK(32);
-   }
+		PUSH( compr );
+		I.TF = I.IF = 0;
+		dest_off = ReadWord(vector);
+		dest_seg = ReadWord(vector+2);
+		PUSH(I.sregs[PS]);
+		PUSH(I.pc);
+		I.pc = (uint16)dest_off;
+		I.sregs[PS] = (uint16)dest_seg;
+		ADDBRANCHTRACE_INT(I.sregs[PS], I.pc);
+		CLK(32);
+	}
 }
 
 static void nec_interrupt(unsigned int_num)
 {
-   uint32 dest_seg, dest_off;
+	uint32_t dest_seg, dest_off;
 
-   if (int_num == -1)
-      return;
+	if (int_num == -1)
+		return;
 
-   i_real_pushf();
-   I.TF = I.IF = 0;	
+	i_real_pushf();
+	I.TF = I.IF = 0;	
 
 
-   dest_off = ReadWord((int_num)*4);
-   dest_seg = ReadWord((int_num)*4+2);
+	dest_off = ReadWord((int_num)*4);
+	dest_seg = ReadWord((int_num)*4+2);
 
-   PUSH(I.sregs[PS]);
-   PUSH(I.pc);
-   I.pc = (uint16)dest_off;
-   I.sregs[PS] = (uint16)dest_seg;
-   ADDBRANCHTRACE(I.sregs[PS], I.pc);
+	PUSH(I.sregs[PS]);
+	PUSH(I.pc);
+	I.pc = (uint16)dest_off;
+	I.sregs[PS] = (uint16)dest_seg;
+	ADDBRANCHTRACE(I.sregs[PS], I.pc);
 }
 
-static bool CheckInHLT(void)
+static uint32_t CheckInHLT(void)
 {
-   if(InHLT)
-   {
-      WSwan_InterruptCheck();
-      if(InHLT)
-      {
-         int32 tmp = v30mz_ICount;
+	if (InHLT)
+	{
+		WSwan_InterruptCheck();
+		if (InHLT)
+		{
+			int32_t tmp = v30mz_ICount;
 
-         if(tmp > 0)
-            CLK(tmp);
-         return(1);
-      }
-   }
+			if(tmp > 0)
+				CLK(tmp);
+			return(1);
+		}
+	}
 
-   return(0);
+	return(0);
 }
 
 
@@ -246,99 +232,124 @@ static bool CheckInHLT(void)
 
 static INLINE void i_real_insb(void)
 {
- PutMemB(DS1,I.regs.w[IY], read_port(I.regs.w[DW])); 
- I.regs.w[IY]+= -2 * I.DF + 1; 
- CLK(6); 
+	PutMemB(DS1,I.regs.w[IY], read_port(I.regs.w[DW])); 
+	I.regs.w[IY]+= -2 * I.DF + 1; 
+	CLK(6); 
 }
 
 static INLINE void i_real_insw(void)
 { 
- PutMemB(DS1,I.regs.w[IY],read_port(I.regs.w[DW])); 
- PutMemB(DS1,(I.regs.w[IY]+1)&0xffff,read_port((I.regs.w[DW]+1)&0xffff)); 
- I.regs.w[IY]+= -4 * I.DF + 2; 
- CLK(6); 
+	PutMemB(DS1,I.regs.w[IY],read_port(I.regs.w[DW])); 
+	PutMemB(DS1,(I.regs.w[IY]+1)&0xffff,read_port((I.regs.w[DW]+1)&0xffff)); 
+	I.regs.w[IY]+= -4 * I.DF + 2; 
+	CLK(6); 
 }
 
 static INLINE void i_real_outsb(void)
 { 
- write_port(I.regs.w[DW],GetMemB(DS0,I.regs.w[IX])); 
- I.regs.w[IX]+= -2 * I.DF + 1; 
- CLK(7); 
+	write_port(I.regs.w[DW],GetMemB(DS0,I.regs.w[IX])); 
+	I.regs.w[IX]+= -2 * I.DF + 1; 
+	CLK(7); 
 } 
 
 static INLINE void i_real_outsw(void)
 {
- write_port(I.regs.w[DW],GetMemB(DS0,I.regs.w[IX])); 
- write_port((I.regs.w[DW]+1)&0xffff,GetMemB(DS0,(I.regs.w[IX]+1)&0xffff)); 
- I.regs.w[IX]+= -4 * I.DF + 2; 
- CLK(7); 
+	write_port(I.regs.w[DW],GetMemB(DS0,I.regs.w[IX])); 
+	write_port((I.regs.w[DW]+1)&0xffff,GetMemB(DS0,(I.regs.w[IX]+1)&0xffff)); 
+	I.regs.w[IX]+= -4 * I.DF + 2; 
+	CLK(7); 
 }
 
 static INLINE void i_real_movsb(void) 
 { 
- uint32 tmp = GetMemB(DS0,I.regs.w[IX]); 
- PutMemB(DS1,I.regs.w[IY], tmp); 
- I.regs.w[IY] += -2 * I.DF + 1; 
- I.regs.w[IX] += -2 * I.DF + 1; 
- CLK(5); 
+	uint32_t tmp = GetMemB(DS0,I.regs.w[IX]); 
+	PutMemB(DS1,I.regs.w[IY], tmp); 
+	I.regs.w[IY] += -2 * I.DF + 1; 
+	I.regs.w[IX] += -2 * I.DF + 1; 
+	CLK(5); 
 }
 
 static INLINE void i_real_movsw(void) 
 {
- uint32 tmp = GetMemW(DS0,I.regs.w[IX]); PutMemW(DS1,I.regs.w[IY], tmp); I.regs.w[IY] += -4 * I.DF + 2; 
-I.regs.w[IX] += -4 * I.DF + 2; CLK(5); 
+	uint32_t tmp = GetMemW(DS0,I.regs.w[IX]);
+	PutMemW(DS1,I.regs.w[IY], tmp);
+	I.regs.w[IY] += -4 * I.DF + 2; 
+	I.regs.w[IX] += -4 * I.DF + 2;
+	CLK(5); 
 }
 
 static INLINE void i_real_cmpsb(void) 
 {
- uint32 src = GetMemB(DS1, I.regs.w[IY]); uint32 dst = GetMemB(DS0, I.regs.w[IX]); SUBB; I.regs.w[IY] += -2 * I.DF + 1; 
-I.regs.w[IX] += -2 * I.DF + 1; CLK(6); 
+	uint32_t src = GetMemB(DS1, I.regs.w[IY]);
+	uint32_t dst = GetMemB(DS0, I.regs.w[IX]);
+	SUBB;
+	I.regs.w[IY] += -2 * I.DF + 1; 
+	I.regs.w[IX] += -2 * I.DF + 1;
+	CLK(6); 
 }
 
 static INLINE void i_real_cmpsw(void) 
 {
- uint32 src = GetMemW(DS1, I.regs.w[IY]); uint32 dst = GetMemW(DS0, I.regs.w[IX]); SUBW; I.regs.w[IY] += -4 * I.DF + 2; 
-I.regs.w[IX] += -4 * I.DF + 2; CLK(6); 
+	uint32_t src = GetMemW(DS1, I.regs.w[IY]);
+	uint32_t dst = GetMemW(DS0, I.regs.w[IX]);
+	SUBW;
+	I.regs.w[IY] += -4 * I.DF + 2; 
+	I.regs.w[IX] += -4 * I.DF + 2;
+	CLK(6); 
 }
 
 static INLINE void i_real_stosb(void) 
 {
- PutMemB(DS1,I.regs.w[IY],I.regs.b[AL]);       I.regs.w[IY] += -2 * I.DF + 1; CLK(3);  
+	PutMemB(DS1,I.regs.w[IY],I.regs.b[AL]);
+	I.regs.w[IY] += -2 * I.DF + 1;
+	CLK(3);  
 }
 
 static INLINE void i_real_stosw(void) 
 {
- PutMemW(DS1,I.regs.w[IY],I.regs.w[AW]);       I.regs.w[IY] += -4 * I.DF + 2; CLK(3);
+	PutMemW(DS1,I.regs.w[IY],I.regs.w[AW]);
+	I.regs.w[IY] += -4 * I.DF + 2;
+	CLK(3);
 }
 
 static INLINE void i_real_lodsb(void) 
 {
- I.regs.b[AL] = GetMemB(DS0,I.regs.w[IX]); I.regs.w[IX] += -2 * I.DF + 1; CLK(3); 
+	I.regs.b[AL] = GetMemB(DS0,I.regs.w[IX]);
+	I.regs.w[IX] += -2 * I.DF + 1;
+	CLK(3); 
 }
 
 static INLINE void i_real_lodsw(void) 
 {
- I.regs.w[AW] = GetMemW(DS0,I.regs.w[IX]); I.regs.w[IX] += -4 * I.DF + 2; CLK(3); 
+	I.regs.w[AW] = GetMemW(DS0,I.regs.w[IX]);
+	I.regs.w[IX] += -4 * I.DF + 2;
+	CLK(3); 
 }
 
 static INLINE void i_real_scasb(void) 
 { 
- uint32 src = GetMemB(DS1, I.regs.w[IY]);      uint32 dst = I.regs.b[AL]; SUBB;
- I.regs.w[IY] += -2 * I.DF + 1; CLK(4); 
+	uint32_t src = GetMemB(DS1, I.regs.w[IY]);
+	uint32_t dst = I.regs.b[AL];
+	SUBB;
+	I.regs.w[IY] += -2 * I.DF + 1;
+	CLK(4); 
 }
 
 static INLINE void i_real_scasw(void) 
 { 
- uint32 src = GetMemW(DS1, I.regs.w[IY]);      uint32 dst = I.regs.w[AW]; SUBW; 
- I.regs.w[IY] += -4 * I.DF + 2; CLK(4); 
+	uint32_t src = GetMemW(DS1, I.regs.w[IY]);
+	uint32_t dst = I.regs.w[AW];
+	SUBW; 
+	I.regs.w[IY] += -4 * I.DF + 2;
+	CLK(4); 
 }
 
 static void DoOP(uint8 opcode)
 {
    //#define OP(num,func_name) static void func_name(void)
-#define OP(num, func_name) case num: 
-#define OP_RANGE(num1, num2, func_name) case num1 ... num2:
-#define OP_EPILOGUE break
+	#define OP(num, func_name) case num: 
+	#define OP_RANGE(num1, num2, func_name) case num1 ... num2:
+	#define OP_EPILOGUE break
 
    switch(opcode)
    {
@@ -454,7 +465,8 @@ static void DoOP(uint8 opcode)
          OP( 0x5e, i_pop_si  ) { POP(I.regs.w[IX]);	CLK(1); } OP_EPILOGUE;
          OP( 0x5f, i_pop_di  ) { POP(I.regs.w[IY]);	CLK(1); } OP_EPILOGUE;
 
-         OP( 0x60, i_pusha  ) {
+         OP( 0x60, i_pusha  ) 
+         {
             unsigned tmp=I.regs.w[SP];
             PUSH(I.regs.w[AW]);
             PUSH(I.regs.w[CW]);
@@ -467,7 +479,8 @@ static void DoOP(uint8 opcode)
             CLK(9);
          } OP_EPILOGUE;
 
-         OP( 0x61, i_popa  ) {
+         OP( 0x61, i_popa  ) 
+         {
             unsigned tmp;
             POP(I.regs.w[IY]);
             POP(I.regs.w[IX]);
@@ -482,7 +495,7 @@ static void DoOP(uint8 opcode)
 
          OP( 0x62, i_chkind  ) 
          {
-            uint32 low,high,tmp;
+            uint32_t low,high,tmp;
 
             GetModRM;
 
@@ -497,10 +510,10 @@ static void DoOP(uint8 opcode)
             }
          } OP_EPILOGUE;
 
-         OP( 0x68, i_push_d16 ) { uint32 tmp;	FETCHuint16(tmp); PUSH(tmp);	CLK(1);	} OP_EPILOGUE;
-         OP( 0x69, i_imul_d16 ) { uint32 tmp;	DEF_r16w; 	FETCHuint16(tmp); dst = (int32)((int16)src)*(int32)((int16)tmp); I.CarryVal = I.OverVal = (((int32)dst) >> 15 != 0) && (((int32)dst) >> 15 != -1);     RegWord(ModRM)=(uint16)dst;     CLKM(4,3);} OP_EPILOGUE;
-         OP( 0x6a, i_push_d8  ) { uint32 tmp = (uint16)((int16)((int8)FETCH)); 	PUSH(tmp);	CLK(1);	} OP_EPILOGUE;
-         OP( 0x6b, i_imul_d8  ) { uint32 src2; DEF_r16w; src2= (uint16)((int16)((int8)FETCH)); dst = (int32)((int16)src)*(int32)((int16)src2); I.CarryVal = I.OverVal = (((int32)dst) >> 15 != 0) && (((int32)dst) >> 15 != -1); RegWord(ModRM)=(uint16)dst; CLKM(4,3); } OP_EPILOGUE;
+         OP( 0x68, i_push_d16 ) { uint32_t tmp;	FETCHuint16(tmp); PUSH(tmp);	CLK(1);	} OP_EPILOGUE;
+         OP( 0x69, i_imul_d16 ) { uint32_t tmp;	DEF_r16w; 	FETCHuint16(tmp); dst = (int32_t)((int16_t)src)*(int32_t)((int16_t)tmp); I.CarryVal = I.OverVal = (((int32_t)dst) >> 15 != 0) && (((int32_t)dst) >> 15 != -1);     RegWord(ModRM)=(uint16)dst;     CLKM(4,3);} OP_EPILOGUE;
+         OP( 0x6a, i_push_d8  ) { uint32_t tmp = (uint16)((int16_t)((int8_t)FETCH)); 	PUSH(tmp);	CLK(1);	} OP_EPILOGUE;
+         OP( 0x6b, i_imul_d8  ) { uint32_t src2; DEF_r16w; src2= (uint16)((int16_t)((int8_t)FETCH)); dst = (int32_t)((int16_t)src)*(int32_t)((int16_t)src2); I.CarryVal = I.OverVal = (((int32_t)dst) >> 15 != 0) && (((int32_t)dst) >> 15 != -1); RegWord(ModRM)=(uint16)dst; CLKM(4,3); } OP_EPILOGUE;
          OP( 0x6c, i_insb     ) { i_real_insb(); } OP_EPILOGUE;
          OP( 0x6d, i_insw     ) { i_real_insw(); } OP_EPILOGUE;
          OP( 0x6e, i_outsb    ) { i_real_outsb(); } OP_EPILOGUE;
@@ -523,7 +536,7 @@ static void DoOP(uint8 opcode)
          OP( 0x7e, i_jle     ) { JMP((ZF)||(SF!=FLAG_O)); 	CLK(1); } OP_EPILOGUE;
          OP( 0x7f, i_jnle    ) { JMP((SF==FLAG_O)&&(!ZF));	CLK(1); } OP_EPILOGUE;
 
-         OP( 0x80, i_80pre   ) { uint32 dst, src; GetModRM; dst = GetRMByte(ModRM); src = FETCH;
+         OP( 0x80, i_80pre   ) { uint32_t dst, src; GetModRM; dst = GetRMByte(ModRM); src = FETCH;
             CLKM(3, 1);
             switch (ModRM & 0x38) {
                case 0x00: ADDB;			PutbackRMByte(ModRM,dst);	break;
@@ -537,7 +550,7 @@ static void DoOP(uint8 opcode)
             }
          } OP_EPILOGUE;
 
-         OP( 0x81, i_81pre   ) { uint32 dst, src; GetModRM; dst = GetRMWord(ModRM); src = FETCH; src+= (FETCH << 8);
+         OP( 0x81, i_81pre   ) { uint32_t dst, src; GetModRM; dst = GetRMWord(ModRM); src = FETCH; src+= (FETCH << 8);
             CLKM(3, 1);
             switch (ModRM & 0x38) {
                case 0x00: ADDW;			PutbackRMWord(ModRM,dst);	break;
@@ -551,7 +564,7 @@ static void DoOP(uint8 opcode)
             }
          } OP_EPILOGUE;
 
-         OP( 0x82, i_82pre   ) { uint32 dst, src; GetModRM; dst = GetRMByte(ModRM); src = (uint8)((int8)FETCH);
+         OP( 0x82, i_82pre   ) { uint32_t dst, src; GetModRM; dst = GetRMByte(ModRM); src = (uint8)((int8_t)FETCH);
             CLKM(3,1);
             switch (ModRM & 0x38) {
                case 0x00: ADDB;			PutbackRMByte(ModRM,dst);	break;
@@ -565,7 +578,7 @@ static void DoOP(uint8 opcode)
             }
          } OP_EPILOGUE;
 
-         OP( 0x83, i_83pre   ) { uint32 dst, src; GetModRM; dst = GetRMWord(ModRM); src = (uint16)((int16)((int8)FETCH));
+         OP( 0x83, i_83pre   ) { uint32_t dst, src; GetModRM; dst = GetRMWord(ModRM); src = (uint16)((int16_t)((int8_t)FETCH));
             CLKM(3,1);
             switch (ModRM & 0x38) {
                case 0x00: ADDW;			PutbackRMWord(ModRM,dst);	break;
@@ -585,12 +598,12 @@ static void DoOP(uint8 opcode)
          OP( 0x87, i_xchg_wr16 ) { DEF_wr16;	RegWord(ModRM)=dst; PutbackRMWord(ModRM,src); CLKM(5,3); } OP_EPILOGUE;
 
          OP( 0x88, i_mov_br8   ) { uint8  src; GetModRM; src = RegByte(ModRM); 	PutRMByte(ModRM,src); 	CLK(1);	} OP_EPILOGUE;
-         OP( 0x89, i_mov_wr16  ) { uint16 src; GetModRM; src = RegWord(ModRM); 	PutRMWord(ModRM,src);	CLK(1); } OP_EPILOGUE;
+         OP( 0x89, i_mov_wr16  ) { uint16_t src; GetModRM; src = RegWord(ModRM); 	PutRMWord(ModRM,src);	CLK(1); } OP_EPILOGUE;
          OP( 0x8a, i_mov_r8b   ) { uint8  src; GetModRM; src = GetRMByte(ModRM);	RegByte(ModRM)=src;	CLK(1);	} OP_EPILOGUE;
-         OP( 0x8b, i_mov_r16w  ) { uint16 src; GetModRM; src = GetRMWord(ModRM);	RegWord(ModRM)=src; 	CLK(1); } OP_EPILOGUE;
+         OP( 0x8b, i_mov_r16w  ) { uint16_t src; GetModRM; src = GetRMWord(ModRM);	RegWord(ModRM)=src; 	CLK(1); } OP_EPILOGUE;
          OP( 0x8c, i_mov_wsreg ) { GetModRM; PutRMWord(ModRM,I.sregs[(ModRM & 0x38) >> 3]);		CLK(1);	} OP_EPILOGUE;
-         OP( 0x8d, i_lea       ) { uint16 ModRM = FETCH; if(ModRM >= 192) { printf("LEA Error: %02x\n", ModRM);} else { (void)(*GetEA[ModRM])(); } RegWord(ModRM)=EO; 	CLK(1);	} OP_EPILOGUE;
-         OP( 0x8e, i_mov_sregw ) { uint16 src; GetModRM; src = GetRMWord(ModRM); CLKM(3,2);
+         OP( 0x8d, i_lea       ) { uint16_t ModRM = FETCH; if(ModRM >= 192) { printf("LEA Error: %02x\n", ModRM);} else { (void)(*GetEA[ModRM])(); } RegWord(ModRM)=EO; 	CLK(1);	} OP_EPILOGUE;
+         OP( 0x8e, i_mov_sregw ) { uint16_t src; GetModRM; src = GetRMWord(ModRM); CLKM(3,2);
             switch (ModRM & 0x38) {
                case 0x00: I.sregs[DS1] = src; break; /* mov ds1,ew */
                case 0x08: I.sregs[PS] = src; break; /* mov cs,ew */
@@ -599,7 +612,7 @@ static void DoOP(uint8 opcode)
             }
          } OP_EPILOGUE;
 
-         OP( 0x8f, i_popw ) { uint16 tmp; GetModRM; POP(tmp); PutRMWord(ModRM,tmp); CLKM(3,1); } OP_EPILOGUE;
+         OP( 0x8f, i_popw ) { uint16_t tmp; GetModRM; POP(tmp); PutRMWord(ModRM,tmp); CLKM(3,1); } OP_EPILOGUE;
          OP( 0x90, i_nop  ) { CLK(3); } OP_EPILOGUE;
 
          OP( 0x91, i_xchg_axcx ) { XchgAWReg(CW); CLK(3); } OP_EPILOGUE;
@@ -616,17 +629,17 @@ static void DoOP(uint8 opcode)
          // AKA CVTWL
          OP( 0x99, i_cwd       ) { I.regs.w[DW] = (I.regs.b[AH] & 0x80) ? 0xffff : 0;	CLK(1);	} OP_EPILOGUE;
 
-         OP( 0x9a, i_call_far  ) { uint32 tmp, tmp2;	FETCHuint16(tmp); FETCHuint16(tmp2); PUSH(I.sregs[PS]); PUSH(I.pc); I.pc = (uint16)tmp; I.sregs[PS] = (uint16)tmp2; ADDBRANCHTRACE(I.sregs[PS], I.pc); CLK(10); } OP_EPILOGUE;
+         OP( 0x9a, i_call_far  ) { uint32_t tmp, tmp2;	FETCHuint16(tmp); FETCHuint16(tmp2); PUSH(I.sregs[PS]); PUSH(I.pc); I.pc = (uint16)tmp; I.sregs[PS] = (uint16)tmp2; ADDBRANCHTRACE(I.sregs[PS], I.pc); CLK(10); } OP_EPILOGUE;
          OP( 0x9b, i_poll      ) { puts("POLL"); } OP_EPILOGUE;
          OP( 0x9c, i_pushf     ) { i_real_pushf(); } OP_EPILOGUE;
          OP( 0x9d, i_popf      ) { i_real_popf();  } OP_EPILOGUE;
-         OP( 0x9e, i_sahf      ) { uint32 tmp = (CompressFlags() & 0xff00) | (I.regs.b[AH] & 0xd5); ExpandFlags(tmp); CLK(4); } OP_EPILOGUE;
+         OP( 0x9e, i_sahf      ) { uint32_t tmp = (CompressFlags() & 0xff00) | (I.regs.b[AH] & 0xd5); ExpandFlags(tmp); CLK(4); } OP_EPILOGUE;
          OP( 0x9f, i_lahf      ) { I.regs.b[AH] = CompressFlags() & 0xff; CLK(2); } OP_EPILOGUE;
 
-         OP( 0xa0, i_mov_aldisp ) { uint32 addr; FETCHuint16(addr); I.regs.b[AL] = GetMemB(DS0, addr); CLK(1); } OP_EPILOGUE;
-         OP( 0xa1, i_mov_axdisp ) { uint32 addr; FETCHuint16(addr); I.regs.b[AL] = GetMemB(DS0, addr); I.regs.b[AH] = GetMemB(DS0, (addr+1)&0xffff); CLK(1); } OP_EPILOGUE;
-         OP( 0xa2, i_mov_dispal ) { uint32 addr; FETCHuint16(addr); PutMemB(DS0, addr, I.regs.b[AL]);  CLK(1); } OP_EPILOGUE;
-         OP( 0xa3, i_mov_dispax ) { uint32 addr; FETCHuint16(addr); PutMemB(DS0, addr, I.regs.b[AL]);  PutMemB(DS0, (addr+1)&0xffff, I.regs.b[AH]); CLK(1); } OP_EPILOGUE;
+         OP( 0xa0, i_mov_aldisp ) { uint32_t addr; FETCHuint16(addr); I.regs.b[AL] = GetMemB(DS0, addr); CLK(1); } OP_EPILOGUE;
+         OP( 0xa1, i_mov_axdisp ) { uint32_t addr; FETCHuint16(addr); I.regs.b[AL] = GetMemB(DS0, addr); I.regs.b[AH] = GetMemB(DS0, (addr+1)&0xffff); CLK(1); } OP_EPILOGUE;
+         OP( 0xa2, i_mov_dispal ) { uint32_t addr; FETCHuint16(addr); PutMemB(DS0, addr, I.regs.b[AL]);  CLK(1); } OP_EPILOGUE;
+         OP( 0xa3, i_mov_dispax ) { uint32_t addr; FETCHuint16(addr); PutMemB(DS0, addr, I.regs.b[AL]);  PutMemB(DS0, (addr+1)&0xffff, I.regs.b[AH]); CLK(1); } OP_EPILOGUE;
 
          OP( 0xa4, i_movsb      ) { i_real_movsb(); } OP_EPILOGUE;
          OP( 0xa5, i_movsw      ) { i_real_movsw(); } OP_EPILOGUE;
@@ -662,7 +675,7 @@ static void DoOP(uint8 opcode)
          OP( 0xbf, i_mov_did16 ) { I.regs.b[IYL] = FETCH; I.regs.b[IYH] = FETCH;	CLK(1); } OP_EPILOGUE;
 
          OP( 0xc0, i_rotshft_bd8 ) {
-            uint32 src, dst; uint8 c;
+            uint32_t src, dst; uint8 c;
             GetModRM; src = (unsigned)GetRMByte(ModRM); dst=src;
             c=FETCH;
             c&=0x1f;
@@ -680,7 +693,7 @@ static void DoOP(uint8 opcode)
          } OP_EPILOGUE;
 
          OP( 0xc1, i_rotshft_wd8 ) {
-            uint32 src, dst;  uint8 c;
+            uint32_t src, dst;  uint8 c;
             GetModRM; src = (unsigned)GetRMWord(ModRM); dst=src;
             c=FETCH;
             c&=0x1f;
@@ -697,17 +710,17 @@ static void DoOP(uint8 opcode)
             }
          } OP_EPILOGUE;
 
-         OP( 0xc2, i_ret_d16  ) { uint32 count = FETCH; count += FETCH << 8; POP(I.pc); I.regs.w[SP]+=count; CLK(6); ADDBRANCHTRACE(I.sregs[PS], I.pc); } OP_EPILOGUE;
+         OP( 0xc2, i_ret_d16  ) { uint32_t count = FETCH; count += FETCH << 8; POP(I.pc); I.regs.w[SP]+=count; CLK(6); ADDBRANCHTRACE(I.sregs[PS], I.pc); } OP_EPILOGUE;
          OP( 0xc3, i_ret      ) { POP(I.pc); CLK(6); ADDBRANCHTRACE(I.sregs[PS], I.pc); } OP_EPILOGUE;
-         OP( 0xc4, i_les_dw   ) { GetModRM; uint16 tmp = GetRMWord(ModRM); RegWord(ModRM)=tmp; I.sregs[DS1] = GetnextRMWord; CLK(6); } OP_EPILOGUE;
-         OP( 0xc5, i_lds_dw   ) { GetModRM; uint16 tmp = GetRMWord(ModRM); RegWord(ModRM)=tmp; I.sregs[DS0] = GetnextRMWord; CLK(6); } OP_EPILOGUE;
+         OP( 0xc4, i_les_dw   ) { GetModRM; uint16_t tmp = GetRMWord(ModRM); RegWord(ModRM)=tmp; I.sregs[DS1] = GetnextRMWord; CLK(6); } OP_EPILOGUE;
+         OP( 0xc5, i_lds_dw   ) { GetModRM; uint16_t tmp = GetRMWord(ModRM); RegWord(ModRM)=tmp; I.sregs[DS0] = GetnextRMWord; CLK(6); } OP_EPILOGUE;
          OP( 0xc6, i_mov_bd8  ) { GetModRM; PutImmRMByte(ModRM); CLK(1); } OP_EPILOGUE;
          OP( 0xc7, i_mov_wd16 ) { GetModRM; PutImmRMWord(ModRM); CLK(1); } OP_EPILOGUE;
 
          // NEC calls it "PREPARE"
          OP( 0xc8, i_enter ) {
-            uint32 nb = FETCH;
-            uint32 i,level;
+            uint32_t nb = FETCH;
+            uint32_t i,level;
 
             CLK(19);
             nb += FETCH << 8;
@@ -731,7 +744,7 @@ static void DoOP(uint8 opcode)
             CLK(2);
          } OP_EPILOGUE;
 
-         OP( 0xca, i_retf_d16  ) { uint32 count = FETCH; count += FETCH << 8; POP(I.pc); POP(I.sregs[PS]); I.regs.w[SP]+=count; CLK(9); ADDBRANCHTRACE(I.sregs[PS], I.pc); } OP_EPILOGUE;
+         OP( 0xca, i_retf_d16  ) { uint32_t count = FETCH; count += FETCH << 8; POP(I.pc); POP(I.sregs[PS]); I.regs.w[SP]+=count; CLK(9); ADDBRANCHTRACE(I.sregs[PS], I.pc); } OP_EPILOGUE;
          OP( 0xcb, i_retf      ) { POP(I.pc); POP(I.sregs[PS]); CLK(8); ADDBRANCHTRACE(I.sregs[PS], I.pc); } OP_EPILOGUE;
          OP( 0xcc, i_int3      ) { nec_interrupt(3); CLK(9); } OP_EPILOGUE;
          OP( 0xcd, i_int       ) { nec_interrupt(FETCH); CLK(10); } OP_EPILOGUE;
@@ -739,7 +752,7 @@ static void DoOP(uint8 opcode)
          OP( 0xcf, i_iret      ) { POP(I.pc); POP(I.sregs[PS]); i_real_popf(); CLK(10); ADDBRANCHTRACE(I.sregs[PS], I.pc); } OP_EPILOGUE;
 
          OP( 0xd0, i_rotshft_b ) {
-            uint32 src, dst; GetModRM; src = (uint32)GetRMByte(ModRM); dst=src;
+            uint32_t src, dst; GetModRM; src = (uint32)GetRMByte(ModRM); dst=src;
             CLKM(3,1);
             switch (ModRM & 0x38) {
                case 0x00: ROL_uint8;  PutbackRMByte(ModRM,(uint8)dst); I.OverVal = (src^dst)&0x80; break;
@@ -754,7 +767,7 @@ static void DoOP(uint8 opcode)
          } OP_EPILOGUE;
 
          OP( 0xd1, i_rotshft_w ) {
-            uint32 src, dst; GetModRM; src = (uint32)GetRMWord(ModRM); dst=src;
+            uint32_t src, dst; GetModRM; src = (uint32)GetRMWord(ModRM); dst=src;
             CLKM(3,1);
             switch (ModRM & 0x38) {
                case 0x00: ROL_uint16;  PutbackRMWord(ModRM,(uint16)dst); I.OverVal = (src^dst)&0x8000; break;
@@ -769,7 +782,7 @@ static void DoOP(uint8 opcode)
          } OP_EPILOGUE;
 
          OP( 0xd2, i_rotshft_bcl ) {
-            uint32 src, dst; uint8 c; GetModRM; src = (uint32)GetRMByte(ModRM); dst=src;
+            uint32_t src, dst; uint8 c; GetModRM; src = (uint32)GetRMByte(ModRM); dst=src;
             c=I.regs.b[CL];
             CLKM(5,3);
             c&=0x1f;
@@ -786,7 +799,7 @@ static void DoOP(uint8 opcode)
          } OP_EPILOGUE;
 
          OP( 0xd3, i_rotshft_wcl ) {
-            uint32 src, dst; uint8 c; GetModRM; src = (uint32)GetRMWord(ModRM); dst=src;
+            uint32_t src, dst; uint8 c; GetModRM; src = (uint32)GetRMWord(ModRM); dst=src;
             c=I.regs.b[CL];
             c&=0x1f;
             CLKM(5,3);
@@ -802,10 +815,10 @@ static void DoOP(uint8 opcode)
             }
          } OP_EPILOGUE;
 
-         OP( 0xd4, i_aam    ) { uint32 mult=FETCH; mult=0; I.regs.b[AH] = I.regs.b[AL] / 10; I.regs.b[AL] %= 10; SetSZPF_Word(I.regs.w[AW]); CLK(17); } OP_EPILOGUE;
-         OP( 0xd5, i_aad    ) { uint32 mult=FETCH; mult=0; I.regs.b[AL] = I.regs.b[AH] * 10 + I.regs.b[AL]; I.regs.b[AH] = 0; SetSZPF_Byte(I.regs.b[AL]); CLK(6); } OP_EPILOGUE;
+         OP( 0xd4, i_aam    ) { uint32_t mult=FETCH; mult=0; I.regs.b[AH] = I.regs.b[AL] / 10; I.regs.b[AL] %= 10; SetSZPF_Word(I.regs.w[AW]); CLK(17); } OP_EPILOGUE;
+         OP( 0xd5, i_aad    ) { uint32_t mult=FETCH; mult=0; I.regs.b[AL] = I.regs.b[AH] * 10 + I.regs.b[AL]; I.regs.b[AH] = 0; SetSZPF_Byte(I.regs.b[AL]); CLK(6); } OP_EPILOGUE;
          OP( 0xd6, i_setalc ) { I.regs.b[AL] = (CF)?0xff:0x00; CLK(3);  } OP_EPILOGUE;
-         OP( 0xd7, i_trans  ) { uint32 dest = (I.regs.w[BW]+I.regs.b[AL])&0xffff; I.regs.b[AL] = GetMemB(DS0, dest); CLK(5); } OP_EPILOGUE;
+         OP( 0xd7, i_trans  ) { uint32_t dest = (I.regs.w[BW]+I.regs.b[AL])&0xffff; I.regs.b[AL] = GetMemB(DS0, dest); CLK(5); } OP_EPILOGUE;
 
       case 0xd8:
       case 0xd9:
@@ -817,25 +830,25 @@ static void DoOP(uint8 opcode)
       case 0xdf:
          { GetModRM; CLK(1); } OP_EPILOGUE;
 
-         OP( 0xe0, i_loopne ) { int8 disp = (int8)FETCH; I.regs.w[CW]--; if (!ZF && I.regs.w[CW]) { I.pc = (uint16)(I.pc+disp);  CLK(6); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(3); } OP_EPILOGUE;
-         OP( 0xe1, i_loope  ) { int8 disp = (int8)FETCH; I.regs.w[CW]--; if ( ZF && I.regs.w[CW]) { I.pc = (uint16)(I.pc+disp);  CLK(6); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(3); } OP_EPILOGUE;
-         OP( 0xe2, i_loop   ) { int8 disp = (int8)FETCH; I.regs.w[CW]--; if (I.regs.w[CW]) { I.pc = (uint16)(I.pc+disp);  CLK(5); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(2); } OP_EPILOGUE;
-         OP( 0xe3, i_jcxz   ) { int8 disp = (int8)FETCH; if (I.regs.w[CW] == 0) { I.pc = (uint16)(I.pc+disp);  CLK(4); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(1); } OP_EPILOGUE;
+         OP( 0xe0, i_loopne ) { int8 disp = (int8_t)FETCH; I.regs.w[CW]--; if (!ZF && I.regs.w[CW]) { I.pc = (uint16)(I.pc+disp);  CLK(6); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(3); } OP_EPILOGUE;
+         OP( 0xe1, i_loope  ) { int8 disp = (int8_t)FETCH; I.regs.w[CW]--; if ( ZF && I.regs.w[CW]) { I.pc = (uint16)(I.pc+disp);  CLK(6); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(3); } OP_EPILOGUE;
+         OP( 0xe2, i_loop   ) { int8 disp = (int8_t)FETCH; I.regs.w[CW]--; if (I.regs.w[CW]) { I.pc = (uint16)(I.pc+disp);  CLK(5); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(2); } OP_EPILOGUE;
+         OP( 0xe3, i_jcxz   ) { int8 disp = (int8_t)FETCH; if (I.regs.w[CW] == 0) { I.pc = (uint16)(I.pc+disp);  CLK(4); ADDBRANCHTRACE(I.sregs[PS], I.pc); } else CLK(1); } OP_EPILOGUE;
          OP( 0xe4, i_inal   ) { uint8 port = FETCH; I.regs.b[AL] = read_port(port); CLK(6);				     	} OP_EPILOGUE;
          OP( 0xe5, i_inax   ) { uint8 port = FETCH; I.regs.b[AL] = read_port(port); I.regs.b[AH] = read_port(port+1); CLK(6); 	} OP_EPILOGUE;
          OP( 0xe6, i_outal  ) { uint8 port = FETCH; write_port(port, I.regs.b[AL]); CLK(6);				     	} OP_EPILOGUE;
          OP( 0xe7, i_outax  ) { uint8 port = FETCH; write_port(port, I.regs.b[AL]); write_port(port+1, I.regs.b[AH]); CLK(6);	} OP_EPILOGUE;
 
-         OP( 0xe8, i_call_d16 ) { uint32 tmp; FETCHuint16(tmp); PUSH(I.pc); I.pc = (uint16)(I.pc+(int16)tmp); ADDBRANCHTRACE(I.sregs[PS], I.pc); CLK(5); } OP_EPILOGUE;
-         OP( 0xe9, i_jmp_d16  ) { uint32 tmp; FETCHuint16(tmp); I.pc = (uint16)(I.pc+(int16)tmp); ADDBRANCHTRACE(I.sregs[PS], I.pc); CLK(4); } OP_EPILOGUE;
-         OP( 0xea, i_jmp_far  ) { uint32 tmp,tmp1; FETCHuint16(tmp); FETCHuint16(tmp1); I.sregs[PS] = (uint16)tmp1; I.pc = (uint16)tmp; ; ADDBRANCHTRACE(I.sregs[PS], I.pc); CLK(7);  } OP_EPILOGUE;
-         OP( 0xeb, i_jmp_d8   ) { int tmp = (int)((int8)FETCH); CLK(4);I.pc = (uint16)(I.pc+tmp); ADDBRANCHTRACE(I.sregs[PS], I.pc); } OP_EPILOGUE;
+         OP( 0xe8, i_call_d16 ) { uint32_t tmp; FETCHuint16(tmp); PUSH(I.pc); I.pc = (uint16)(I.pc+(int16_t)tmp); ADDBRANCHTRACE(I.sregs[PS], I.pc); CLK(5); } OP_EPILOGUE;
+         OP( 0xe9, i_jmp_d16  ) { uint32_t tmp; FETCHuint16(tmp); I.pc = (uint16)(I.pc+(int16_t)tmp); ADDBRANCHTRACE(I.sregs[PS], I.pc); CLK(4); } OP_EPILOGUE;
+         OP( 0xea, i_jmp_far  ) { uint32_t tmp,tmp1; FETCHuint16(tmp); FETCHuint16(tmp1); I.sregs[PS] = (uint16)tmp1; I.pc = (uint16)tmp; ; ADDBRANCHTRACE(I.sregs[PS], I.pc); CLK(7);  } OP_EPILOGUE;
+         OP( 0xeb, i_jmp_d8   ) { int tmp = (int)((int8_t)FETCH); CLK(4);I.pc = (uint16)(I.pc+tmp); ADDBRANCHTRACE(I.sregs[PS], I.pc); } OP_EPILOGUE;
 
          OP( 0xec, i_inaldx   ) { I.regs.b[AL] = read_port(I.regs.w[DW]); CLK(6);} OP_EPILOGUE;
-         OP( 0xed, i_inaxdx   ) { uint32 port = I.regs.w[DW];	I.regs.b[AL] = read_port(port);	I.regs.b[AH] = read_port(port+1); CLK(6); } OP_EPILOGUE;
+         OP( 0xed, i_inaxdx   ) { uint32_t port = I.regs.w[DW];	I.regs.b[AL] = read_port(port);	I.regs.b[AH] = read_port(port+1); CLK(6); } OP_EPILOGUE;
 
          OP( 0xee, i_outdxal  ) { write_port(I.regs.w[DW], I.regs.b[AL]); CLK(6); } OP_EPILOGUE;
-         OP( 0xef, i_outdxax  ) { uint32 port = I.regs.w[DW];	write_port(port, I.regs.b[AL]);	write_port(port+1, I.regs.b[AH]); CLK(6); } OP_EPILOGUE;
+         OP( 0xef, i_outdxax  ) { uint32_t port = I.regs.w[DW];	write_port(port, I.regs.b[AL]);	write_port(port+1, I.regs.b[AH]); CLK(6); } OP_EPILOGUE;
 
          // NEC calls it "BUSLOCK"
          OP( 0xf0, i_lock     ) { CLK(1); DoOP(FETCHOP); } OP_EPILOGUE;
@@ -845,7 +858,7 @@ static void DoOP(uint8 opcode)
 
          OP( 0xf2, i_repne    ) 
          { 
-            uint32 next = FETCHOP; 
+            uint32_t next = FETCHOP; 
 
             switch(next) { /* Segments */
                case 0x26:	seg_prefix=true;	prefix_base=I.sregs[DS1]<<4;	next = FETCHOP;	CLK(2); break;
@@ -876,7 +889,7 @@ static void DoOP(uint8 opcode)
 
          OP( 0xf3, i_repe) 
          { 
-            uint32 next = FETCHOP;
+            uint32_t next = FETCHOP;
 
             switch(next) { /* Segments */
                case 0x26:	seg_prefix=true;	prefix_base=I.sregs[DS1]<<4;	next = FETCHOP;	CLK(2); break;
@@ -907,7 +920,7 @@ static void DoOP(uint8 opcode)
          OP( 0xf4, i_hlt ) { InHLT = true; CheckInHLT(); } OP_EPILOGUE;
 
          OP( 0xf5, i_cmc ) { I.CarryVal = !CF; CLK(4); } OP_EPILOGUE;
-         OP( 0xf6, i_f6pre ) { uint32 tmp; uint32 uresult,uresult2; int32 result,result2;
+         OP( 0xf6, i_f6pre ) { uint32_t tmp; uint32_t uresult,uresult2; int32 result,result2;
             GetModRM; tmp = GetRMByte(ModRM);
             switch (ModRM & 0x38) {
                case 0x00: tmp &= FETCH; I.CarryVal = I.OverVal = I.AuxVal=0; SetSZPF_Byte(tmp); CLKM(2,1); break; /* TEST */
@@ -916,13 +929,13 @@ static void DoOP(uint8 opcode)
 
                case 0x18: I.CarryVal=(tmp!=0);tmp=(~tmp)+1; SetSZPF_Byte(tmp); PutbackRMByte(ModRM,tmp&0xff); CLKM(3,1); break; /* NEG */
                case 0x20: uresult = I.regs.b[AL]*tmp; I.regs.w[AW]=(uint16)uresult; I.CarryVal=I.OverVal=(I.regs.b[AH]!=0); CLKM(4,3); break; /* MULU */
-               case 0x28: result = (int16)((int8)I.regs.b[AL])*(int16)((int8)tmp); I.regs.w[AW]=(uint16)result; I.CarryVal=I.OverVal=(I.regs.b[AH]!=0); CLKM(4,3); break; /* MUL */
+               case 0x28: result = (int16_t)((int8_t)I.regs.b[AL])*(int16_t)((int8_t)tmp); I.regs.w[AW]=(uint16)result; I.CarryVal=I.OverVal=(I.regs.b[AH]!=0); CLKM(4,3); break; /* MUL */
                case 0x30: if (tmp) { DIVUB; } else nec_interrupt(0); CLKM(16,15); break;
                case 0x38: if (tmp) { DIVB;  } else nec_interrupt(0); CLKM(18,17); break;
             }
          } OP_EPILOGUE;
 
-         OP( 0xf7, i_f7pre   ) { uint32 tmp,tmp2; uint32 uresult,uresult2; int32 result,result2;
+         OP( 0xf7, i_f7pre   ) { uint32_t tmp,tmp2; uint32_t uresult,uresult2; int32 result,result2;
             GetModRM; tmp = GetRMWord(ModRM);
             switch (ModRM & 0x38) {
                case 0x00: FETCHuint16(tmp2); tmp &= tmp2; I.CarryVal = I.OverVal = I.AuxVal=0; SetSZPF_Word(tmp); CLKM(2,1); break; /* TEST */
@@ -930,7 +943,7 @@ static void DoOP(uint8 opcode)
                case 0x10: PutbackRMWord(ModRM,~tmp); CLKM(3,1); break; /* NOT */
                case 0x18: I.CarryVal=(tmp!=0); tmp=(~tmp)+1; SetSZPF_Word(tmp); PutbackRMWord(ModRM,tmp&0xffff); CLKM(3,1); break; /* NEG */
                case 0x20: uresult = I.regs.w[AW]*tmp; I.regs.w[AW]=uresult&0xffff; I.regs.w[DW]=((uint32)uresult)>>16; I.CarryVal=I.OverVal=(I.regs.w[DW]!=0); CLKM(4,3); break; /* MULU */
-               case 0x28: result = (int32)((int16)I.regs.w[AW])*(int32)((int16)tmp); I.regs.w[AW]=result&0xffff; I.regs.w[DW]=result>>16; I.CarryVal=I.OverVal=(I.regs.w[DW]!=0); CLKM(4,3); break; /* MUL */
+               case 0x28: result = (int32_t)((int16_t)I.regs.w[AW])*(int32_t)((int16_t)tmp); I.regs.w[AW]=result&0xffff; I.regs.w[DW]=result>>16; I.CarryVal=I.OverVal=(I.regs.w[DW]!=0); CLKM(4,3); break; /* MUL */
                case 0x30: if (tmp) { DIVUW; } else nec_interrupt(0); CLKM(24,23); break;
                case 0x38: if (tmp) { DIVW;  } else nec_interrupt(0); CLKM(25,24); break;
             }
@@ -942,14 +955,14 @@ static void DoOP(uint8 opcode)
          OP( 0xfb, i_ei    ) { SetIF(1);		CLK(4);	} OP_EPILOGUE;
          OP( 0xfc, i_cld   ) { SetDF(0);		CLK(4);	} OP_EPILOGUE;
          OP( 0xfd, i_std   ) { SetDF(1);		CLK(4);	} OP_EPILOGUE;
-         OP( 0xfe, i_fepre ) { uint32 tmp, tmp1; GetModRM; tmp=GetRMByte(ModRM);
+         OP( 0xfe, i_fepre ) { uint32_t tmp, tmp1; GetModRM; tmp=GetRMByte(ModRM);
             switch(ModRM & 0x38) {
                case 0x00: tmp1 = tmp+1; I.OverVal = (tmp==0x7f); SetAF(tmp1,tmp,1); SetSZPF_Byte(tmp1); PutbackRMByte(ModRM,(uint8)tmp1); CLKM(3,1); break; /* INC */
                case 0x08: tmp1 = tmp-1; I.OverVal = (tmp==0x80); SetAF(tmp1,tmp,1); SetSZPF_Byte(tmp1); PutbackRMByte(ModRM,(uint8)tmp1); CLKM(3,1); break; /* DEC */
             }
          } OP_EPILOGUE;
 
-         OP( 0xff, i_ffpre ) { uint32 tmp, tmp1; GetModRM; tmp=GetRMWord(ModRM);
+         OP( 0xff, i_ffpre ) { uint32_t tmp, tmp1; GetModRM; tmp=GetRMWord(ModRM);
             switch(ModRM & 0x38) {
                case 0x00: tmp1 = tmp+1; I.OverVal = (tmp==0x7fff); SetAF(tmp1,tmp,1); SetSZPF_Word(tmp1); PutbackRMWord(ModRM,(uint16)tmp1); CLKM(3,1); break; /* INC */
                case 0x08: tmp1 = tmp-1; I.OverVal = (tmp==0x8000); SetAF(tmp1,tmp,1); SetSZPF_Word(tmp1); PutbackRMWord(ModRM,(uint16)tmp1); CLKM(3,1); break; /* DEC */
@@ -1028,40 +1041,6 @@ void v30mz_set_reg(int regnum, unsigned val)
    }
 }
 
-#ifdef WANT_DEBUGGER
-static void (*save_cpu_writemem20)(uint32,uint8);
-static uint8 (*save_cpu_readport)(uint32);
-static void (*save_cpu_writeport)(uint32, uint8);
-static uint8 (*save_cpu_readmem20)(uint32);
-
-static void test_cpu_writemem20(uint32 A, uint8 V)
-{
-   if(write_hook)
-      write_hook(A, V);
-}
-
-static uint8 test_cpu_readmem20(uint32 A)
-{
-   if(read_hook)
-      return(read_hook(A));
-   else
-      return(save_cpu_readmem20(A));
-}
-
-static void test_cpu_writeport(uint32 A, uint8 V)
-{
-   if(port_write_hook)
-      port_write_hook(A, V);
-}
-
-static uint8 test_cpu_readport(uint32 A)
-{
-   if(port_read_hook)
-      return(port_read_hook(A));
-   else
-      return(save_cpu_readport(A));
-}
-#endif
 
 void v30mz_execute(int cycles)
 {
@@ -1077,11 +1056,6 @@ void v30mz_execute(int cycles)
 
          if(tmp > 0)
             CLK(tmp);
-
-#ifdef WANT_DEBUGGER
-         if(cpu_hook)
-            cpu_hook(I.pc);
-#endif
          return;
       }
    }
@@ -1092,95 +1066,39 @@ void v30mz_execute(int cycles)
 
       WSwan_InterruptCheck();
 
-#ifdef WANT_DEBUGGER
-      if(hookie_hickey)
-      {
-         uint32 save_timestamp = v30mz_timestamp;
-         int32 save_ICount = v30mz_ICount;
-         v30mz_regs_t save_I = I;
-         uint32 save_prefix_base = prefix_base;
-         char save_seg_prefix = seg_prefix;
-         void (*save_branch_trace_hook)(uint16 from_CS, uint16 from_IP, uint16 to_CS, uint16 to_IP, bool interrupt) = branch_trace_hook;
-
-         branch_trace_hook = NULL;
-
-         save_cpu_writemem20 = cpu_writemem20;
-         save_cpu_readport = cpu_readport;
-         save_cpu_writeport = cpu_writeport;
-         save_cpu_readmem20 = cpu_readmem20;
-
-         cpu_writemem20 = test_cpu_writemem20;
-         cpu_readmem20 = test_cpu_readmem20;
-         cpu_writeport = test_cpu_writeport;
-         cpu_readport = test_cpu_readport;
-
-         DoOP(FETCHOP);
-
-         branch_trace_hook = save_branch_trace_hook;
-         v30mz_timestamp = save_timestamp;
-         v30mz_ICount = save_ICount;
-         I = save_I;
-         prefix_base = save_prefix_base;
-         seg_prefix = save_seg_prefix;
-         cpu_readmem20 = save_cpu_readmem20;
-         cpu_writemem20 = save_cpu_writemem20;
-         cpu_readport = save_cpu_readport;
-         cpu_writeport = save_cpu_writeport;
-         InHLT = false;
-      }
-
-      if(cpu_hook)
-         cpu_hook(I.pc);
-#endif
-
       DoOP(FETCHOP);
    }
 
 }
 
-#ifdef WANT_DEBUGGER
-void v30mz_debug(void (*CPUHook)(uint32), uint8 (*ReadHook)(uint32), void (*WriteHook)(uint32, uint8), uint8 (*PortReadHook)(uint32), 
-      void (*PortWriteHook)(uint32, uint8), void (*BranchTraceHook)(uint16 from_CS, uint16 from_IP, uint16 to_CS, uint16 to_IP, bool interrupt))
+void WSwan_v30mzSaveState(uint32_t load, FILE* fp)
 {
-   cpu_hook = CPUHook;
-   read_hook = ReadHook;
-   write_hook = WriteHook;
-   port_read_hook = PortReadHook;
-   port_write_hook = PortWriteHook;
-
-   hookie_hickey = read_hook || write_hook || port_read_hook || port_write_hook;
-
-   branch_trace_hook = BranchTraceHook;
-}
-#endif
-
-int v30mz_StateAction(StateMem *sm, int load, int data_only)
-{
-   uint16 PSW;
-
-   SFORMAT StateRegs[] =
-   {
-      SFVARN(I.pc, "IP"),
-      SFARRAY16N(I.regs.w, 8, "regs"),
-      SFARRAY16N(I.sregs, 4, "sregs"),
-
-      SFVARN(v30mz_ICount, "ICount"),
-      SFVARN(InHLT, "InHLT"),
-      SFVARN(prefix_base, "prefix_base"),
-      SFVARN(seg_prefix, "seg_prefix"),
-      SFVAR(PSW),
-      SFEND
-   };
-
-   PSW = CompressFlags();
-
-   if(!MDFNSS_StateAction(sm, load, data_only, StateRegs, "V30", false))
-      return(0);
-
-   if(load)
-   {
-      ExpandFlags(PSW);
-   }
-
-   return(1);
+	uint16_t PSW;
+	
+	if (load == 1)
+	{
+		fread(&v30mz_ICount, sizeof(uint8_t), sizeof(v30mz_ICount), fp);
+		fread(&InHLT, sizeof(uint8_t), sizeof(InHLT), fp);
+		fread(&prefix_base, sizeof(uint8_t), sizeof(prefix_base), fp);
+		fread(&seg_prefix, sizeof(uint8_t), sizeof(seg_prefix), fp);
+		fread(&PSW, sizeof(uint8_t), sizeof(PSW), fp);
+		fread(&I.pc, sizeof(uint8_t), sizeof(I.pc), fp);
+		fread(&I.regs.w, sizeof(uint8_t), sizeof(I.regs.w), fp);
+		fread(&I.sregs, sizeof(uint8_t), sizeof(I.sregs), fp);
+		
+		ExpandFlags(PSW);
+	}
+	else
+	{
+		PSW = CompressFlags();
+		
+		fwrite(&v30mz_ICount, sizeof(uint8_t), sizeof(v30mz_ICount), fp);
+		fwrite(&InHLT, sizeof(uint8_t), sizeof(InHLT), fp);
+		fwrite(&prefix_base, sizeof(uint8_t), sizeof(prefix_base), fp);
+		fwrite(&seg_prefix, sizeof(uint8_t), sizeof(seg_prefix), fp);
+		fwrite(&PSW, sizeof(uint8_t), sizeof(PSW), fp);
+		fwrite(&I.pc, sizeof(uint8_t), sizeof(I.pc), fp);
+		fwrite(&I.regs.w, sizeof(uint8_t), sizeof(I.regs.w), fp);
+		fwrite(&I.sregs, sizeof(uint8_t), sizeof(I.sregs), fp);
+	}
 }

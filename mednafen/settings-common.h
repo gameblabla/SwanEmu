@@ -3,10 +3,10 @@
 typedef enum
 {
 	// Actual base types
-        MDFNST_INT = 0,     // (signed), int8, int16, int32, int64(saved as)
-        MDFNST_UINT,    // uint8, uint16, uint32, uint64(saved as)
-        MDFNST_BOOL,    // bool. bool. bool!
-        MDFNST_FLOAT,   // float, double(saved as).
+	MDFNST_INT = 0,     // (signed), int8, int16, int32, int64(saved as)
+	MDFNST_UINT,    // uint8, uint16, uint32, uint64(saved as)
+	MDFNST_BOOL,    // bool. bool. bool!
+	MDFNST_FLOAT,   // float, double(saved as).
 	MDFNST_STRING,
 	MDFNST_ENUM,	// Handled like a string, but validated against the enumeration list, and MDFN_GetSettingUI() returns the number in the enumeration list.
 
@@ -46,30 +46,30 @@ typedef struct
 
 typedef struct
 {
-        const char *name;
+	const char *name;
 	uint32 flags;
-        const char *description; // Short
+	const char *description; // Short
 	const char *description_extra;
 
-        MDFNSettingType type;
-        const char *default_value;
+	MDFNSettingType type;
+	const char *default_value;
 	const char *minimum;
 	const char *maximum;
-	bool (*validate_func)(const char *name, const char *value);
+	uint32_t (*validate_func)(const char *name, const char *value);
 	void (*ChangeNotification)(const char *name);
 	const MDFNSetting_EnumList *enum_list;
 } MDFNSetting;
 
 typedef struct __MDFNCS
 {
-        char *name;
-        char *value;
+	char *name;
+	char *value;
 	char *game_override;    // per-game setting override(netplay_override > game_override > value, in precedence)
 
 	const MDFNSetting *desc;
 	void (*ChangeNotification)(const char *name);
-
-        uint32 name_hash;
+	
+	uint32 name_hash;
 } MDFNCS;
 
 #endif

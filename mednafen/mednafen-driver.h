@@ -7,19 +7,12 @@
 
 /* Indent stdout newlines +- "indent" amount */
 void MDFN_indent(int indent);
-void MDFN_printf(const char *format, ...);
-
-#define MDFNI_printf MDFN_printf
-
-/* Displays an error.  Can block or not. */
-void MDFND_PrintError(const char *s);
-void MDFND_Message(const char *s);
 
 uint32 MDFND_GetTime(void);
 void MDFND_Sleep(uint32 ms);
 
 // Call this function as early as possible, even before MDFNI_Initialize()
-bool MDFNI_InitializeModule(void);
+uint32_t MDFNI_InitializeModule(void);
 
 /* allocates memory.  0 on failure, 1 on success. */
 /* Also pass it the base directory to load the configuration file. */

@@ -1,6 +1,8 @@
 *.o
-*.so
-*.dll
-*.dylib
-/old
-*.a
+*.ws
+*.wsc
+*.bin
+*.gcda
+*.epm
+*.sts
+*.elf

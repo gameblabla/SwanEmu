@@ -2,9 +2,11 @@
 #define __WSWAN_H
 
 #include "../mednafen.h"
-#include "../state.h"
 
 #include "interrupt.h"
+
+#define true 1
+#define false 0
 
 #define  mBCD(value) (((value)/10)<<4)|((value)%10)
 

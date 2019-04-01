@@ -31,25 +31,8 @@ typedef uint64_t uint64;
   #define MDFN_WARN_UNUSED_RESULT __attribute__ ((warn_unused_result))
   #define MDFN_NOWARN_UNUSED __attribute__((unused))
 
-#elif defined(_MSC_VER)
-#if _MSC_VER < 1800
-#define roundf(in) (in >= 0.0f ? floorf(in + 0.5f) : ceilf(in - 0.5f))
-#endif
-#define NO_INLINE
-#define MDFN_LIKELY(n) ((n) != 0)
-#define MDFN_UNLIKELY(n) ((n) != 0)
-
-  #define MDFN_FASTCALL
-
-  #define MDFN_ALIGN(n) __declspec(align(n))
-
-  #define MDFN_FORMATSTR(a,b,c)
-
-  #define MDFN_WARN_UNUSED_RESULT
-  #define MDFN_NOWARN_UNUSED
-
 #else
-  #error "Not compiling with GCC nor MSVC"
+  #error "Not compiling with GCC"
   #define NO_INLINE
 
   #define MDFN_FASTCALL

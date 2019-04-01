@@ -57,7 +57,7 @@ void WSWan_TCacheInvalidByAddr(uint32 ws_offset)
    }
 }
 
-void wsSetVideo(int number,bool force)
+void wsSetVideo(int number,uint32_t force)
 {
    if((number!=wsVMode)||(force))
    { 

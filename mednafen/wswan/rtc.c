@@ -21,10 +21,10 @@
 #include "wswan.h"
 #include <time.h>
 
-static uint64 CurrentTime;
-static uint32 ClockCycleCounter;
-static uint8 wsCA15;
-static uint8 Command, Data;
+static uint64_t CurrentTime;
+static uint32_t ClockCycleCounter;
+static uint8_t wsCA15;
+static uint8_t Command, Data;
 
 void WSwan_RTCWrite(uint32 A, uint8 V)
 {
@@ -106,20 +106,23 @@ void WSwan_RTCClock(uint32 cycles)
    }
 }
 
-int WSwan_RTCStateAction(StateMem *sm, int load, int data_only)
+void WSwan_RTCSaveState(uint32_t load, FILE* fp)
 {
-   SFORMAT StateRegs[] =
-   {
-      SFVAR(CurrentTime),
-      SFVAR(ClockCycleCounter),
-      SFVAR(wsCA15),
-      SFVAR(Command),
-      SFVAR(Data),
-      SFEND
-   };
+	if (load == 1)
+	{
+		fread(&CurrentTime, sizeof(uint8_t), sizeof(CurrentTime), fp);
+		fread(&ClockCycleCounter, sizeof(uint8_t), sizeof(ClockCycleCounter), fp);
+		fread(&wsCA15, sizeof(uint8_t), sizeof(wsCA15), fp);
+		fread(&Command, sizeof(uint8_t), sizeof(Command), fp);
+		fread(&Data, sizeof(uint8_t), sizeof(Data), fp);
+	}
+	else
+	{
+		fwrite(&CurrentTime, sizeof(uint8_t), sizeof(CurrentTime), fp);
+		fwrite(&ClockCycleCounter, sizeof(uint8_t), sizeof(ClockCycleCounter), fp);
+		fwrite(&wsCA15, sizeof(uint8_t), sizeof(wsCA15), fp);
+		fwrite(&Command, sizeof(uint8_t), sizeof(Command), fp);
+		fwrite(&Data, sizeof(uint8_t), sizeof(Data), fp);
+	}
 
-   if(!MDFNSS_StateAction(sm, load, data_only, StateRegs, "RTC", false))
-      return(0);
-
-   return(1);
 }
