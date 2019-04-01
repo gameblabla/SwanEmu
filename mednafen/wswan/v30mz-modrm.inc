@@ -35,7 +35,7 @@ static struct {
 
 #define PutImmRMWord(ModRM) 				\
 {							\
-	uint16 val;					\
+	uint16_t val;					\
 	if (ModRM >= 0xc0)				\
 		FETCHuint16(I.regs.w[Mod_RM.RM.w[ModRM]]) \
 	else {						\
@@ -75,30 +75,30 @@ static struct {
 }
 
 #define DEF_br8							\
-	uint32 ModRM = FETCH,src,dst;		\
+	uint32_t  ModRM = FETCH,src,dst;		\
 	src = RegByte(ModRM);				\
     dst = GetRMByte(ModRM)
     
 #define DEF_wr16						\
-	uint32 ModRM = FETCH,src,dst;		\
+	uint32_t  ModRM = FETCH,src,dst;		\
 	src = RegWord(ModRM);				\
     dst = GetRMWord(ModRM)
 
 #define DEF_r8b							\
-	uint32 ModRM = FETCH,src,dst;		\
+	uint32_t  ModRM = FETCH,src,dst;		\
 	dst = RegByte(ModRM);				\
     src = GetRMByte(ModRM)
 
 #define DEF_r16w						\
-	uint32 ModRM = FETCH,src,dst;		\
+	uint32_t  ModRM = FETCH,src,dst;		\
 	dst = RegWord(ModRM);				\
     src = GetRMWord(ModRM)
 
 #define DEF_ald8						\
-	uint32 src = FETCH;					\
-	uint32 dst = I.regs.b[AL]
+	uint32_t  src = FETCH;					\
+	uint32_t  dst = I.regs.b[AL]
 
 #define DEF_axd16						\
-	uint32 src = FETCH; 				\
-	uint32 dst = I.regs.w[AW];			\
+	uint32_t  src = FETCH; 				\
+	uint32_t  dst = I.regs.w[AW];			\
     src += (FETCH << 8)

@@ -10,7 +10,7 @@
 
 #define  mBCD(value) (((value)/10)<<4)|((value)%10)
 
-extern          uint32 rom_size;
+extern          uint32_t rom_size;
 extern          int wsc;
 
 enum

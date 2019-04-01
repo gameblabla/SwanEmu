@@ -57,7 +57,7 @@ static uint32_t language;
 
 extern uint16_t WSButtonStatus;
 
-void WSwan_writemem20(uint32 A, uint8 V)
+void WSwan_writemem20(uint32_t A, uint8_t V)
 {
 	uint32_t offset = A & 0xffff;
 	uint32_t bank = (A>>16) & 0xF;
@@ -82,11 +82,11 @@ void WSwan_writemem20(uint32 A, uint8 V)
    }
 }
 
-uint8 WSwan_readmem20(uint32 A)
+uint8_t WSwan_readmem20(uint32_t A)
 {
-   uint8 bank_num;
-   uint32 offset = A & 0xFFFF;
-   uint32 bank   = (A >> 16) & 0xF;
+   uint8_t bank_num;
+   uint32_t offset = A & 0xFFFF;
+   uint32_t bank   = (A >> 16) & 0xF;
 
    switch(bank)
    {
@@ -132,7 +132,7 @@ void WSwan_CheckSoundDMA(void)
    {
       if(SoundDMALength)
       {
-         uint8 zebyte = WSwan_readmem20(SoundDMASource);
+         uint8_t zebyte = WSwan_readmem20(SoundDMASource);
 
          if(SoundDMAControl & 0x08)
             zebyte ^= 0x80;
@@ -151,7 +151,7 @@ void WSwan_CheckSoundDMA(void)
    }
 }
 
-uint8 WSwan_readport(uint32 number)
+uint8_t WSwan_readport(uint32_t number)
 {
    number &= 0xFF;
 
@@ -199,7 +199,7 @@ uint8 WSwan_readport(uint32 number)
 
       case 0xb3: 
                  {
-                    uint8 ret = CommControl & 0xf0;
+                    uint8_t ret = CommControl & 0xf0;
 
                     if(CommControl & 0x80)
                        ret |= 0x4; // Send complete
@@ -208,7 +208,7 @@ uint8 WSwan_readport(uint32 number)
                  }
       case 0xb5: 
                  {
-                    uint8 ret = (ButtonWhich << 4) | ButtonReadLatch;
+                    uint8_t ret = (ButtonWhich << 4) | ButtonReadLatch;
                     return(ret);
                  }
    }
@@ -219,7 +219,7 @@ uint8 WSwan_readport(uint32 number)
    return(0);
 }
 
-void WSwan_writeport(uint32 IOPort, uint8 V)
+void WSwan_writeport(uint32_t IOPort, uint8_t V)
 {
 	IOPort &= 0xFF;
 
@@ -305,13 +305,13 @@ void WSwan_MemoryKill(void)
    wsSRAM = NULL;
 }
 
-void WSwan_MemoryInit(uint32_t lang, uint32_t IsWSC, uint32 ssize, uint32_t SkipSaveLoad)
+void WSwan_MemoryInit(uint32_t lang, uint32_t IsWSC, uint32_t ssize, uint32_t SkipSaveLoad)
 {
-   const uint16 byear = MDFN_GetSettingUI("wswan.byear");
-   const uint8 bmonth = MDFN_GetSettingUI("wswan.bmonth");
-   const uint8 bday = MDFN_GetSettingUI("wswan.bday");
-   const uint8 sex = MDFN_GetSettingI("wswan.sex");
-   const uint8 blood = MDFN_GetSettingI("wswan.blood");
+   const uint16_t byear = MDFN_GetSettingUI("wswan.byear");
+   const uint8_t bmonth = MDFN_GetSettingUI("wswan.bmonth");
+   const uint8_t bday = MDFN_GetSettingUI("wswan.bday");
+   const uint8_t sex = MDFN_GetSettingI("wswan.sex");
+   const uint8_t blood = MDFN_GetSettingI("wswan.blood");
 
    language = lang;
    SkipSL = SkipSaveLoad;
@@ -324,7 +324,7 @@ void WSwan_MemoryInit(uint32_t lang, uint32_t IsWSC, uint32 ssize, uint32_t Skip
 
    if(sram_size)
    {
-      wsSRAM = (uint8*)malloc(sram_size);
+      wsSRAM = (uint8_t*)malloc(sram_size);
       memset(wsSRAM, 0, sram_size);
    }
 

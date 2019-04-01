@@ -7,9 +7,6 @@
 #include <string.h>
 
 #include "git.h"
-
-extern MDFNGI *MDFNGameInfo;
-
 #include "settings.h"
 #include "mednafen-driver.h"
 

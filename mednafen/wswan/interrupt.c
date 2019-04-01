@@ -43,7 +43,7 @@ void WSwan_Interrupt(int which)
    RecalcInterrupt();
 }
 
-void WSwan_InterruptWrite(uint32 A, uint8 V)
+void WSwan_InterruptWrite(uint32_t A, uint8_t V)
 {
    switch(A)
    {
@@ -60,7 +60,7 @@ void WSwan_InterruptWrite(uint32 A, uint8 V)
    }
 }
 
-uint8 WSwan_InterruptRead(uint32 A)
+uint8_t WSwan_InterruptRead(uint32_t A)
 {
    switch(A)
    {

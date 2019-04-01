@@ -33,7 +33,8 @@ static uint16_t ColorMapG[16];
 static uint16_t ColorMap[4096];
 static uint32_t LayerEnabled;
 
-static uint8_t wsLine;                 /*current scanline*/
+/* Current scanline */
+static uint8_t wsLine;
 
 static uint8_t SpriteTable[0x80][4];
 static uint32_t SpriteCountCache;
@@ -62,13 +63,13 @@ void WSwan_GfxInit(void)
    LayerEnabled = 7; // BG, FG, sprites
 }
 
-void WSwan_GfxWSCPaletteRAMWrite(uint32 ws_offset, uint8 data)
+void WSwan_GfxWSCPaletteRAMWrite(uint32_t ws_offset, uint8_t data)
 {
 	ws_offset = (ws_offset&0xfffe)-0xfe00;
 	wsCols[(ws_offset>>1)>>4][(ws_offset>>1)&15] = wsRAM[ws_offset+0xfe00] | ((wsRAM[ws_offset+0xfe01]&0x0f) << 8);
 }
 
-void WSwan_GfxWrite(uint32 A, uint8 V)
+void WSwan_GfxWrite(uint32_t A, uint8_t V)
 {
    if(A >= 0x1C && A <= 0x1F)
    {
@@ -176,11 +177,11 @@ void WSwan_GfxWrite(uint32 A, uint8 V)
    }
 }
 
-uint8 WSwan_GfxRead(uint32 A)
+uint8_t WSwan_GfxRead(uint32_t A)
 {
    if(A >= 0x1C && A <= 0x1F)
    {
-      uint8 ret = 0;
+      uint8_t ret = 0;
 
       ret |= 0xF - wsColors[(A - 0x1C) * 2 + 0];
       ret |= (0xF - wsColors[(A - 0x1C) * 2 + 1]) << 4;
@@ -264,47 +265,48 @@ uint8 WSwan_GfxRead(uint32 A)
    return 0;
 }
 
-uint32_t wsExecuteLine(MDFN_Surface *surface, uint32_t skip)
+uint32_t wsExecuteLine(uint16_t* restrict pixels, uint8_t pitch, uint32_t skip)
 {
-   uint32_t ret = false;
+	uint32_t ret = false;
 
-   if(wsLine < 144)
+	if (wsLine < 144)
+	{
+		if (!skip)
+		{
+			wsScanline(pixels + wsLine * pitch);
+		}
+	}
+
+	WSwan_CheckSoundDMA();
+
+	// Update sprite data table
+	if (wsLine == 142)
+	{
+		SpriteCountCache = SpriteCount;
+
+		if(SpriteCountCache > 0x80)
+			SpriteCountCache = 0x80;
+
+		memcpy(SpriteTable, &wsRAM[(SPRBase << 9) + (SpriteStart << 2)], SpriteCountCache << 2);
+	}
+
+	if (wsLine == 144)
+	{
+		ret = true;
+		WSwan_Interrupt(WSINT_VBLANK);
+	}
+
+
+   if (HBCounter && (BTimerControl & 0x01))
    {
-      if(!skip)
-         wsScanline(surface->pixels + wsLine * surface->pitch);
-   }
-
-   WSwan_CheckSoundDMA();
-
-   // Update sprite data table
-   if(wsLine == 142)
-   {
-      SpriteCountCache = SpriteCount;
-
-      if(SpriteCountCache > 0x80)
-         SpriteCountCache = 0x80;
-
-      memcpy(SpriteTable, &wsRAM[(SPRBase << 9) + (SpriteStart << 2)], SpriteCountCache << 2);
-   }
-
-   if(wsLine == 144)
-   {
-      ret = true;
-      WSwan_Interrupt(WSINT_VBLANK);
-      //printf("VBlank: %d\n", wsLine);
-   }
-
-
-   if(HBCounter && (BTimerControl & 0x01))
-   {
-      HBCounter--;
-      if(!HBCounter)
-      {
-         // Loop mode?
-         if(BTimerControl & 0x02)
-            HBCounter = HBTimerPeriod;
-         WSwan_Interrupt(WSINT_HBLANK_TIMER);
-      }
+		HBCounter--;
+		if (!HBCounter)
+		{
+			// Loop mode?
+			if(BTimerControl & 0x02)
+				HBCounter = HBTimerPeriod;
+			WSwan_Interrupt(WSINT_HBLANK_TIMER);
+		}
    }
 
    v30mz_execute(224);
@@ -336,7 +338,7 @@ uint32_t wsExecuteLine(MDFN_Surface *surface, uint32_t skip)
    return(ret);
 }
 
-void WSwan_SetLayerEnableMask(uint64 mask)
+void WSwan_SetLayerEnableMask(uint64_t mask)
 {
    LayerEnabled = mask;
 }
@@ -353,11 +355,11 @@ void WSwan_SetPixelFormat(void)
       ColorMapG[i] = MAKECOLOR((i * 17), (i * 17), (i * 17), 0); //(neo_r << rs) | (neo_g << gs) | (neo_b << bs);
 }
 
-void wsScanline(uint16 *target)
+void wsScanline(uint16_t* restrict target)
 {
-   uint32		start_tile_n,map_a,startindex,adrbuf,b1,b2,j,t,l;
-   uint8		b_bg[256];
-   uint8		b_bg_pal[256];
+   uint32_t	start_tile_n,map_a,startindex,adrbuf,b1,b2,j,t,l;
+   uint8_t	b_bg[256];
+   uint8_t	b_bg_pal[256];
 
    if(!wsVMode)
       memset(b_bg, wsColors[BGColor&0xF]&0xF, 256);
@@ -367,7 +369,7 @@ void wsScanline(uint16 *target)
       memset(&b_bg_pal[0], (BGColor>>4)  & 0xF, 256);
    }
    start_tile_n=(wsLine+BGYScroll)&0xff;/*First line*/
-   map_a=(((uint32)(FGBGLoc&0xF))<<11)+((start_tile_n&0xfff8)<<3);
+   map_a=(((uint32_t)(FGBGLoc&0xF))<<11)+((start_tile_n&0xfff8)<<3);
    startindex = BGXScroll >> 3; /*First tile in row*/
    adrbuf = 7-(BGXScroll&7); /*Pixel in tile*/
 
@@ -377,7 +379,7 @@ void wsScanline(uint16 *target)
       {
          b1=wsRAM[map_a+(startindex<<1)];
          b2=wsRAM[map_a+(startindex<<1)+1];
-         uint32 palette=(b2>>1)&15;
+         uint32_t palette=(b2>>1)&15;
          b2=(b2<<8)|b1;
          wsGetTile(b2&0x1ff,start_tile_n&7,b2&0x8000,b2&0x4000,b2&0x2000);
 
@@ -417,7 +419,7 @@ void wsScanline(uint16 *target)
 
    if((DispControl & 0x02) && (LayerEnabled & 0x02))/*FG layer*/
    {
-      uint8 windowtype = DispControl&0x30;
+      uint8_t windowtype = DispControl&0x30;
       uint32_t in_window[256 + 8*2];
 
       if(windowtype)
@@ -447,7 +449,7 @@ void wsScanline(uint16 *target)
          memset(in_window, 1, sizeof(in_window));
 
       start_tile_n=(wsLine+FGYScroll)&0xff;
-      map_a=(((uint32)((FGBGLoc>>4)&0xF))<<11)+((start_tile_n>>3)<<6);
+      map_a=(((uint32_t)((FGBGLoc>>4)&0xF))<<11)+((start_tile_n>>3)<<6);
       startindex = FGXScroll >> 3;
       adrbuf = 7-(FGXScroll&7);
 
@@ -455,7 +457,7 @@ void wsScanline(uint16 *target)
       {
          b1=wsRAM[map_a+(startindex<<1)];
          b2=wsRAM[map_a+(startindex<<1)+1];
-         uint32 palette=(b2>>1)&15;
+         uint32_t palette=(b2>>1)&15;
          b2=(b2<<8)|b1;
          wsGetTile(b2&0x1ff,start_tile_n&7,b2&0x8000,b2&0x4000,b2&0x2000);
 
@@ -519,7 +521,7 @@ void wsScanline(uint16 *target)
          if(xs >= 249) xs -= 256;
 
          if(ysx > 150) 
-            ys = (int8)ysx;
+            ys = (int8_t)ysx;
          else 
             ys = ysx;
 
@@ -527,7 +529,7 @@ void wsScanline(uint16 *target)
 
          if(ys >= 0 && ys < 8 && xs < 224)
          {
-            uint32 palette = ((as >> 1) & 0x7);
+            uint32_t palette = ((as >> 1) & 0x7);
 
             ts |= (as&1) << 8;
             wsGetTile(ts, ys, as & 0x80, as & 0x40, 0);

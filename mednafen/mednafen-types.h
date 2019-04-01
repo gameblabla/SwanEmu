@@ -3,7 +3,7 @@
 
 #include <assert.h>
 #include <stdint.h>
-
+/*
 typedef int8_t int8;
 typedef int16_t int16;
 typedef int32_t int32; 
@@ -13,6 +13,7 @@ typedef uint8_t uint8;
 typedef uint16_t uint16;
 typedef uint32_t uint32;
 typedef uint64_t uint64;
+*/
 
 #ifdef __GNUC__
 #define MDFN_UNLIKELY(n) __builtin_expect((n) != 0, 0)
@@ -45,46 +46,5 @@ typedef uint64_t uint64;
 
 #endif
 
-
-typedef struct
-{
- union
- {
-  struct
-  {
-   #ifdef MSB_FIRST
-   uint8   High;
-   uint8   Low;
-   #else
-   uint8   Low;
-   uint8   High;
-   #endif
-  } Union8;
-  uint16 Val16;
- };
-} Uuint16;
-
-typedef struct
-{
- union
- {
-  struct
-  {
-   #ifdef MSB_FIRST
-   Uuint16   High;
-   Uuint16   Low;
-   #else
-   Uuint16   Low;
-   Uuint16   High;
-   #endif
-  } Union16;
-  uint32  Val32;
- };
-} Uuint32;
-
-#define MDFN_COLD
-
-#undef require
-#define require( expr ) assert( expr )
 
 #endif

@@ -47,19 +47,19 @@ typedef enum
 #define SetZF(x)		(I.ZeroVal = (x))
 #define SetPF(x)		(I.ParityVal = (x))
 
-#define SetSZPF_Byte(x) (I.SignVal=I.ZeroVal=I.ParityVal=(int8)(x))
-#define SetSZPF_Word(x) (I.SignVal=I.ZeroVal=I.ParityVal=(int16)(x))
+#define SetSZPF_Byte(x) (I.SignVal=I.ZeroVal=I.ParityVal=(int8_t)(x))
+#define SetSZPF_Word(x) (I.SignVal=I.ZeroVal=I.ParityVal=(int16_t)(x))
 
 #define SetOFW_Add(x,y,z)	(I.OverVal = ((x) ^ (y)) & ((x) ^ (z)) & 0x8000)
 #define SetOFB_Add(x,y,z)	(I.OverVal = ((x) ^ (y)) & ((x) ^ (z)) & 0x80)
 #define SetOFW_Sub(x,y,z)	(I.OverVal = ((z) ^ (y)) & ((z) ^ (x)) & 0x8000)
 #define SetOFB_Sub(x,y,z)	(I.OverVal = ((z) ^ (y)) & ((z) ^ (x)) & 0x80)
 
-#define ADDB { uint32 res=dst+src; SetCFB(res); SetOFB_Add(res,src,dst); SetAF(res,src,dst); SetSZPF_Byte(res); dst=(uint8)res; }
-#define ADDW { uint32 res=dst+src; SetCFW(res); SetOFW_Add(res,src,dst); SetAF(res,src,dst); SetSZPF_Word(res); dst=(uint16)res; }
+#define ADDB { uint32_t res=dst+src; SetCFB(res); SetOFB_Add(res,src,dst); SetAF(res,src,dst); SetSZPF_Byte(res); dst=(uint8_t)res; }
+#define ADDW { uint32_t res=dst+src; SetCFW(res); SetOFW_Add(res,src,dst); SetAF(res,src,dst); SetSZPF_Word(res); dst=(uint16_t)res; }
 
-#define SUBB { uint32 res=dst-src; SetCFB(res); SetOFB_Sub(res,src,dst); SetAF(res,src,dst); SetSZPF_Byte(res); dst=(uint8)res; }
-#define SUBW { uint32 res=dst-src; SetCFW(res); SetOFW_Sub(res,src,dst); SetAF(res,src,dst); SetSZPF_Word(res); dst=(uint16)res; }
+#define SUBB { uint32_t res=dst-src; SetCFB(res); SetOFB_Sub(res,src,dst); SetAF(res,src,dst); SetSZPF_Byte(res); dst=(uint8_t)res; }
+#define SUBW { uint32_t res=dst-src; SetCFW(res); SetOFW_Sub(res,src,dst); SetAF(res,src,dst); SetSZPF_Word(res); dst=(uint16_t)res; }
 
 #define ORB dst|=src; I.CarryVal=I.OverVal=I.AuxVal=0; SetSZPF_Byte(dst)
 #define ORW dst|=src; I.CarryVal=I.OverVal=I.AuxVal=0; SetSZPF_Word(dst)
@@ -73,7 +73,7 @@ typedef enum
 #define CF		(I.CarryVal!=0)
 #define SF		(I.SignVal<0)
 #define ZF		(I.ZeroVal==0)
-#define PF		parity_table[(uint8)I.ParityVal]
+#define PF		parity_table[(uint8_t)I.ParityVal]
 #define AF		(I.AuxVal!=0)
 #define FLAG_O		(I.OverVal!=0)
 
@@ -83,17 +83,17 @@ typedef enum
 
 #define DefaultBase(Seg) ((seg_prefix && (Seg==DS0 || Seg==SS)) ? prefix_base : I.sregs[Seg] << 4)
 
-#define GetMemB(Seg,Off) ((uint8)cpu_readmem20((DefaultBase(Seg)+(Off))))
-#define GetMemW(Seg,Off) ((uint16) cpu_readmem20((DefaultBase(Seg)+(Off))) + (cpu_readmem20((DefaultBase(Seg)+((Off)+1)))<<8) )
+#define GetMemB(Seg,Off) ((uint8_t)cpu_readmem20((DefaultBase(Seg)+(Off))))
+#define GetMemW(Seg,Off) ((uint16_t) cpu_readmem20((DefaultBase(Seg)+(Off))) + (cpu_readmem20((DefaultBase(Seg)+((Off)+1)))<<8) )
 
 #define PutMemB(Seg,Off,x) { cpu_writemem20((DefaultBase(Seg)+(Off)),(x)); }
-#define PutMemW(Seg,Off,x) { PutMemB(Seg,Off,(x)&0xff); PutMemB(Seg,(Off)+1,(uint8)((x)>>8)); }
+#define PutMemW(Seg,Off,x) { PutMemB(Seg,Off,(x)&0xff); PutMemB(Seg,(Off)+1,(uint8_t)((x)>>8)); }
 
 /* Todo:  Remove these later - plus readword could overflow */
-#define ReadByte(ea) ((uint8)cpu_readmem20((ea)))
+#define ReadByte(ea) ((uint8_t)cpu_readmem20((ea)))
 #define ReadWord(ea) (cpu_readmem20((ea))+(cpu_readmem20(((ea)+1))<<8))
 #define WriteByte(ea,val) { cpu_writemem20((ea),val); }
-#define WriteWord(ea,val) { cpu_writemem20((ea),(uint8)(val)); cpu_writemem20(((ea)+1),(val)>>8); }
+#define WriteWord(ea,val) { cpu_writemem20((ea),(uint8_t)(val)); cpu_writemem20(((ea)+1),(val)>>8); }
 
 #define read_port(port) cpu_readport(port)
 #define write_port(port,val) cpu_writeport(port,val)
@@ -101,10 +101,10 @@ typedef enum
 #define FETCH (cpu_readop_arg((I.sregs[PS]<<4)+I.pc++))
 #define FETCHOP (cpu_readop((I.sregs[PS]<<4)+I.pc++))
 #define FETCHuint16(var) { var=cpu_readop_arg((((I.sregs[PS]<<4)+I.pc)))+(cpu_readop_arg((((I.sregs[PS]<<4)+I.pc+1)))<<8); I.pc+=2; }
-#define PEEK(addr) ((uint8)cpu_readop_arg(addr))
-#define PEEKOP(addr) ((uint8)cpu_readop(addr))
+#define PEEK(addr) ((uint8_t)cpu_readop_arg(addr))
+#define PEEKOP(addr) ((uint8_t)cpu_readop(addr))
 
-#define GetModRM uint32 ModRM=cpu_readop_arg((I.sregs[PS]<<4)+I.pc++)
+#define GetModRM uint32_t ModRM=cpu_readop_arg((I.sregs[PS]<<4)+I.pc++)
 
 /* Cycle count macros:
 	CLK  - cycle count is the same on all processors
@@ -122,7 +122,7 @@ typedef enum
 #define CLKM(mcount, ccount) { if(ModRM >=0xc0 ) { CLK(ccount);} else {CLK(mcount);} }
 
 
-#define CompressFlags() (uint16)(CF | (PF << 2) | (AF << 4) | (ZF << 6) \
+#define CompressFlags() (uint16_t)(CF | (PF << 2) | (AF << 4) | (ZF << 6) \
 				| (SF << 7) | (I.TF << 8) | (I.IF << 9) \
 				| (I.DF << 10) | (FLAG_O << 11) | (0xF002))
 
@@ -161,10 +161,10 @@ typedef enum
 	I.regs.w[Reg]=tmp1
 
 #define JMP(flag)							\
-	int tmp = (int)((int8)FETCH);			\
+	int tmp = (int)((int8_t)FETCH);			\
 	if (flag)								\
 	{										\
-		I.pc = (uint16)(I.pc+tmp);			\
+		I.pc = (uint16_t)(I.pc+tmp);			\
 		CLK(3);	\
 		ADDBRANCHTRACE(I.sregs[PS], I.pc);		\
 		return;								\
@@ -173,7 +173,7 @@ typedef enum
 #define ADJ4(param1,param2)					\
 	if (AF || ((I.regs.b[AL] & 0xf) > 9))	\
 	{										\
-		uint16 tmp;							\
+		uint16_t tmp;							\
 		tmp = I.regs.b[AL] + param1;	\
 		I.regs.b[AL] = tmp;	\
 		I.AuxVal = 1;						\
@@ -208,7 +208,7 @@ typedef enum
 		tmp |= (1<<tmp2)
 
 #define XchgAWReg(Reg) 						\
-    uint16 tmp; 								\
+    uint16_t tmp; 								\
 	tmp = I.regs.w[Reg]; 					\
 	I.regs.w[Reg] = I.regs.w[AW]; 			\
 	I.regs.w[AW] = tmp
@@ -221,12 +221,12 @@ typedef enum
 #define ROLC_uint16 dst = (dst << 1) + CF; SetCFW(dst)
 #define RORC_uint8 dst = (CF<<8)+dst; I.CarryVal = dst & 0x01; dst >>= 1
 #define RORC_uint16 dst = (CF<<16)+dst; I.CarryVal = dst & 0x01; dst >>= 1
-#define SHL_uint8(c) dst <<= c;	SetCFB(dst); SetSZPF_Byte(dst);	PutbackRMByte(ModRM,(uint8)dst)
-#define SHL_uint16(c) dst <<= c;	SetCFW(dst); SetSZPF_Word(dst);	PutbackRMWord(ModRM,(uint16)dst)
-#define SHR_uint8(c) dst >>= c-1; I.CarryVal = dst & 0x1; dst >>= 1; SetSZPF_Byte(dst); PutbackRMByte(ModRM,(uint8)dst)
-#define SHR_uint16(c) dst >>= c-1; I.CarryVal = dst & 0x1; dst >>= 1; SetSZPF_Word(dst); PutbackRMWord(ModRM,(uint16)dst)
-#define SHRA_uint8(c) dst = ((int8)dst) >> (c-1);	I.CarryVal = dst & 0x1;	dst = ((int8)((uint8)dst)) >> 1; SetSZPF_Byte(dst); PutbackRMByte(ModRM,(uint8)dst)
-#define SHRA_uint16(c) dst = ((int16)dst) >> (c-1);	I.CarryVal = dst & 0x1;	dst = ((int16)((uint16)dst)) >> 1; SetSZPF_Word(dst); PutbackRMWord(ModRM,(uint16)dst)
+#define SHL_uint8(c) dst <<= c;	SetCFB(dst); SetSZPF_Byte(dst);	PutbackRMByte(ModRM,(uint8_t)dst)
+#define SHL_uint16(c) dst <<= c;	SetCFW(dst); SetSZPF_Word(dst);	PutbackRMWord(ModRM,(uint16_t)dst)
+#define SHR_uint8(c) dst >>= c-1; I.CarryVal = dst & 0x1; dst >>= 1; SetSZPF_Byte(dst); PutbackRMByte(ModRM,(uint8_t)dst)
+#define SHR_uint16(c) dst >>= c-1; I.CarryVal = dst & 0x1; dst >>= 1; SetSZPF_Word(dst); PutbackRMWord(ModRM,(uint16_t)dst)
+#define SHRA_uint8(c) dst = ((int8_t)dst) >> (c-1);	I.CarryVal = dst & 0x1;	dst = ((int8_t)((uint8_t)dst)) >> 1; SetSZPF_Byte(dst); PutbackRMByte(ModRM,(uint8_t)dst)
+#define SHRA_uint16(c) dst = ((int16_t)dst) >> (c-1);	I.CarryVal = dst & 0x1;	dst = ((int16_t)((uint16_t)dst)) >> 1; SetSZPF_Word(dst); PutbackRMWord(ModRM,(uint16_t)dst)
 
 #define DIVUB												\
 	uresult = I.regs.w[AW];									\
@@ -239,9 +239,9 @@ typedef enum
 	}
 
 #define DIVB												\
-	result = (int16)I.regs.w[AW];							\
-	result2 = result % (int16)((int8)tmp);					\
-	if ((result /= (int16)((int8)tmp)) > 0xff) {			\
+	result = (int16_t)I.regs.w[AW];							\
+	result2 = result % (int16_t)((int8_t)tmp);					\
+	if ((result /= (int16_t)((int8_t)tmp)) > 0xff) {			\
 		nec_interrupt(0); break;							\
 	} else {												\
 		I.regs.b[AL] = result;								\
@@ -249,7 +249,7 @@ typedef enum
 	}
 
 #define DIVUW												\
-	uresult = (((uint32)I.regs.w[DW]) << 16) | I.regs.w[AW];\
+	uresult = (((uint32_t)I.regs.w[DW]) << 16) | I.regs.w[AW];\
 	uresult2 = uresult % tmp;								\
 	if ((uresult /= tmp) > 0xffff) {						\
 		nec_interrupt(0); break;							\
@@ -259,9 +259,9 @@ typedef enum
 	}
 
 #define DIVW												\
-	result = ((uint32)I.regs.w[DW] << 16) + I.regs.w[AW];	\
-	result2 = result % (int32)((int16)tmp);					\
-	if ((result /= (int32)((int16)tmp)) > 0xffff) {			\
+	result = ((uint32_t)I.regs.w[DW] << 16) + I.regs.w[AW];	\
+	result2 = result % (int32_t)((int16_t)tmp);					\
+	if ((result /= (int32_t)((int16_t)tmp)) > 0xffff) {			\
 		nec_interrupt(0); break;							\
 	} else {												\
 		I.regs.w[AW]=result;								\

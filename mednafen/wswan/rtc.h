@@ -1,10 +1,10 @@
 #ifndef __WSWAN_RTC_H
 #define __WSWAN_RTC_H
 
-void WSwan_RTCWrite(uint32 A, uint8 V);
-uint8 WSwan_RTCRead(uint32 A);
+void WSwan_RTCWrite(uint32_t A, uint8_t V);
+uint8_t WSwan_RTCRead(uint32_t A);
 void WSwan_RTCReset(void);
-void WSwan_RTCClock(uint32 cycles);
+void WSwan_RTCClock(uint32_t cycles);
 void WSwan_RTCSaveState(uint32_t load, FILE* fp);
 
 #endif

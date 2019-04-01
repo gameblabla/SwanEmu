@@ -4,34 +4,21 @@
 
 #include "mednafen/wswan/gfx.h"
 
-#include "libretro.h"
-//#include <retro_math.h>
 #include <SDL/SDL.h>
 #include <portaudio.h>
 
 PaStream *apu_stream;
 
-static MDFNGI *game;
+static uint32_t game;
 
-static retro_video_refresh_t video_cb;
-static retro_audio_sample_t audio_cb;
-static retro_audio_sample_batch_t audio_batch_cb;
-static retro_environment_t environ_cb;
-static retro_input_poll_t input_poll_cb;
-static retro_input_state_t input_state_cb;
-
-static bool overscan;
 static double last_sound_rate;
 
-static bool rotate_tall;
-static bool select_pressed_last_frame;
+static uint8_t rotate_tall;
+static uint8_t select_pressed_last_frame;
 
 static unsigned rotate_joymap;
 
-static MDFN_Surface *surf;
-
 uint32_t done = 0;
-
 char* buf_rom;
 
 /* Cygne
@@ -77,7 +64,7 @@ uint32_t rom_size;
 uint16_t WSButtonStatus;
 
 
-static uint8 WSRCurrentSong;
+static uint8_t WSRCurrentSong;
 
 static void Reset(void)
 {
@@ -194,12 +181,9 @@ static int32_t update_input(void)
 
 static void Emulate(EmulateSpecStruct *espec)
 {
-	if (espec->SoundFormatChanged)
-	WSwan_SetSoundRate(espec->SoundRate);
-
 	WSButtonStatus = update_input();
  
-	while(!wsExecuteLine(espec->surface, espec->skip))
+	while(!wsExecuteLine(screen->pixels,screen->w, 0))
 	{
 
 	}
@@ -290,7 +274,7 @@ static int Load(const uint8_t *data, size_t size)
 	pow_size      = next_pow2(real_rom_size);
 	rom_size      = pow_size + (pow_size == 0);
 
-	wsCartROM     = (uint8 *)calloc(1, rom_size);
+	wsCartROM     = (uint8_t *)calloc(1, rom_size);
 
 	/* This real_rom_size vs rom_size funny business is intended primarily for handling WSR files. */
 	if(real_rom_size < rom_size)
@@ -397,107 +381,6 @@ static void CloseGame(void)
 	}
 }
 
-static const MDFNSetting_EnumList SexList[] =
-{
-	{ "m", WSWAN_SEX_MALE },
-	{ "male", WSWAN_SEX_MALE, "Male" },
-
-	{ "f", WSWAN_SEX_FEMALE },
-	{ "female", WSWAN_SEX_FEMALE, "Female" },
-
-	{ "3", 3 },
-
-	{ NULL, 0 },
-};
-
-static const MDFNSetting_EnumList BloodList[] =
-{
-	{ "a", WSWAN_BLOOD_A, "A" },
-	{ "b", WSWAN_BLOOD_B, "B" },
-	{ "o", WSWAN_BLOOD_O, "O" },
-	{ "ab", WSWAN_BLOOD_AB, "AB" },
-
-	{ "5", 5 },
-
-	{ NULL, 0 },
-};
-
-static const MDFNSetting_EnumList LanguageList[] =
-{
-	{ "japanese", 0, "Japanese" },
-	{ "0", 0 },
-
-	{ "english", 1, "English" },
-	{ "1", 1 },
-
-	{ NULL, 0 },
-};
-
-static const MDFNSetting WSwanSettings[] =
-{
-	{ "wswan.rotateinput", MDFNSF_NOFLAGS, "Virtually rotate D-pads along with screen.", NULL, MDFNST_BOOL, "0" },
-	{ "wswan.language", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Language games should display text in.", "The only game this setting is known to affect is \"Digimon Tamers - Battle Spirit\".", MDFNST_ENUM, "english", NULL, NULL, NULL, NULL, LanguageList },
-	{ "wswan.name", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Name", NULL, MDFNST_STRING, "Mednafen" },
-	{ "wswan.byear", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Birth Year", NULL, MDFNST_UINT, "1989", "0", "9999" },
-	{ "wswan.bmonth", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Birth Month", NULL, MDFNST_UINT, "6", "1", "12" },
-	{ "wswan.bday", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Birth Day", NULL, MDFNST_UINT, "23", "1", "31" },
-	{ "wswan.sex", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Sex", NULL, MDFNST_ENUM, "F", NULL, NULL, NULL, NULL, SexList },
-	{ "wswan.blood", MDFNSF_EMU_STATE | MDFNSF_UNTRUSTED_SAFE, "Blood Type", NULL, MDFNST_ENUM, "O", NULL, NULL, NULL, NULL, BloodList },
-	{ NULL }
-};
-
-static const FileExtensionSpecStruct KnownExtensions[] =
-{
-	{ ".ws", "WonderSwan ROM Image" },
-	{ ".wsc", "WonderSwan Color ROM Image" },
-	{ ".wsr", "WonderSwan Music Rip" },
-	{ ".pc2", "Benesse Pocket Challenge 2" },
-	{ NULL, NULL }
-};
-
-MDFNGI EmulatedWSwan =
-{
-	WSwanSettings,
-	MDFN_MASTERCLOCK_FIXED(3072000),
-	0,
-	false, // Multires possible?
-
-	224,   // lcm_width
-	144,   // lcm_height
-	NULL,  // Dummy
-
-	224,	// Nominal width
-	144,	// Nominal height
-
-	224,	// Framebuffer width
-	144,	// Framebuffer height
-
-	2,     // Number of output sound channels
-};
-
-
-#define MEDNAFEN_CORE_NAME_MODULE "wswan"
-#define MEDNAFEN_CORE_NAME "Mednafen WonderSwan"
-#define MEDNAFEN_CORE_VERSION "v0.9.35.1"
-#define MEDNAFEN_CORE_EXTENSIONS "ws|wsc|pc2"
-#define MEDNAFEN_CORE_TIMING_FPS 75.47
-#define MEDNAFEN_CORE_GEOMETRY_BASE_W (game->nominal_width)
-#define MEDNAFEN_CORE_GEOMETRY_BASE_H (game->nominal_height)
-#define MEDNAFEN_CORE_GEOMETRY_MAX_W 224
-#define MEDNAFEN_CORE_GEOMETRY_MAX_H 144
-#define MEDNAFEN_CORE_GEOMETRY_ASPECT_RATIO (14.0 / 9.0)
-#define FB_WIDTH 224
-#define FB_HEIGHT 144
-
-#define FB_MAX_HEIGHT FB_HEIGHT
-
-
-bool retro_video_refresh_callback(const void *data, unsigned width, unsigned height, size_t pitch)
-{
-	return true;
-}
-
-
 static uint32_t MDFNI_LoadGame(const char *force_module, const uint8_t *data, size_t size)
 {
 	if(Load(data, size) <= 0)
@@ -517,83 +400,40 @@ void WS_reset(void)
 	Reset();
 }
 
-static void set_volume (uint32_t *ptr, unsigned number)
+static uint8_t Load_Game(char* path)
 {
-   switch(number)
-   {
-      default:
-         *ptr = number;
-         break;
-   }
-}
-
-static void check_variables(void)
-{
-   struct retro_variable var = {0};
-
-   var.key = "wswan_rotate_keymap",
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value) {
-      if (!strcmp(var.value, "disabled"))
-         rotate_joymap = 0;
-      else if (!strcmp(var.value, "enabled"))
-         rotate_joymap = 1;
-      else if (!strcmp(var.value, "auto"))
-         rotate_joymap = 2;
-   }
-
-}
-
-#define MAX_PLAYERS 1
-#define MAX_BUTTONS 11
-
-
-bool retro_load_game(const struct retro_game_info *info)
-{
-   if (!info)
-      return false;
-
-   overscan = false;
-   environ_cb(RETRO_ENVIRONMENT_GET_OVERSCAN, &overscan);
-
-   game = MDFNI_LoadGame(MEDNAFEN_CORE_NAME_MODULE, (const uint8_t*)info->data, info->size);
-   if (!game)
-   {
-	 
+	FILE* fp;
+	uint32_t size_rom;
+   
+	fp = fopen(path, "rb");
+    
+    fseek (fp, 0, SEEK_END);
+    size_rom = ftell (fp);
+    
+    buf_rom = malloc(size_rom);
+    
+	fseek (fp, 0, SEEK_SET);
+	fread (buf_rom,1,size_rom,fp);
+	
+    fclose (fp);
+    
+	game = MDFNI_LoadGame("wswan", (const uint8_t*)buf_rom, size_rom);
+	if (!game)
+	{
 		printf("Failed to load game ROM\n");
 		return false;
-   }
-
-   surf = (MDFN_Surface*)calloc(1, sizeof(*surf));
+	}
    
-   if (!surf)
-      return false;
-   
-   surf->width  = FB_WIDTH;
-   surf->height = FB_HEIGHT;
-   surf->pitch  = FB_WIDTH;
+	rotate_tall = false;
+	select_pressed_last_frame = false;
+	rotate_joymap = 0;
 
-   surf->pixels = (uint16_t*)calloc(1, FB_WIDTH * FB_HEIGHT * 2);
+	WSwan_SetPixelFormat();
 
-   if (!surf->pixels)
-   {
-      free(surf);
-      return false;
-   }
-   
-   rotate_tall = false;
-   select_pressed_last_frame = false;
-   rotate_joymap = 0;
-
-   check_variables();
-
-   WSwan_SetPixelFormat();
-
-   return true;
+	return true;
 }
 
-void retro_unload_game()
+void Unload_game()
 {
    if (!game)
       return;
@@ -604,98 +444,32 @@ void retro_unload_game()
 
 static uint64_t video_frames, audio_frames;
 
-
-void retro_run(void)
+static void Run_Emulator(void)
 {
-   static int16_t sound_buf[0x10000];
-   static MDFN_Rect rects[FB_MAX_HEIGHT];
-   rects[0].w = ~0;
+	static int16_t sound_buf[0x10000];
 
-   EmulateSpecStruct spec = {0};
-   spec.surface = surf;
-   spec.SoundRate = 44100;
-   spec.SoundBuf = sound_buf;
-   spec.LineWidths = rects;
-   spec.SoundBufMaxSize = sizeof(sound_buf) / 2;
-   spec.SoundVolume = 1.0;
-   spec.soundmultiplier = 1.0;
-   spec.SoundBufSize = 0;
-   spec.VideoFormatChanged = false;
-   spec.SoundFormatChanged = false;
+	EmulateSpecStruct spec = {0};
+	spec.SoundRate = 44100;
+	spec.SoundBuf = sound_buf;
+	spec.SoundBufMaxSize = sizeof(sound_buf) / 2;
+	spec.SoundVolume = 1.0;
+	spec.soundmultiplier = 1.0;
+	spec.SoundBufSize = 0;
 
-   if (spec.SoundRate != last_sound_rate)
-   {
-      spec.SoundFormatChanged = true;
-      last_sound_rate = spec.SoundRate;
-   }
+	Emulate(&spec);
 
-   Emulate(&spec);
+	int16_t *const SoundBuf = spec.SoundBuf + spec.SoundBufSizeALMS * 2;
+	int32_t SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
+	const int32_t SoundBufMaxSize = spec.SoundBufMaxSize - spec.SoundBufSizeALMS;
 
-   int16_t *const SoundBuf = spec.SoundBuf + spec.SoundBufSizeALMS * 2;
-   int32_t SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
-   const int32_t SoundBufMaxSize = spec.SoundBufMaxSize - spec.SoundBufSizeALMS;
+	spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
 
-   spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
-
-   unsigned width  = spec.DisplayRect.w;
-   unsigned height = spec.DisplayRect.h;
-   
-   video_cb(surf->pixels, width, height, FB_WIDTH << 1);
-
-   video_frames++;
-   audio_frames += spec.SoundBufSize;
-
-   audio_batch_cb(spec.SoundBuf, spec.SoundBufSize);
+	video_frames++;
+	audio_frames += spec.SoundBufSize;
+	PaError err = Pa_WriteStream( apu_stream, spec.SoundBuf, spec.SoundBufSize);
 }
 
-void retro_deinit(void)
-{
-   if (surf)
-      free(surf);
-   surf = NULL;
-}
-
-void retro_set_controller_port_device(unsigned in_port, unsigned device)
-{
-}
-
-void retro_set_environment(retro_environment_t cb)
-{
-	environ_cb = cb;
-	struct retro_variable variables[] = 
-	{
-		{ "wswan_rotate_keymap", "Rotate button mappings; auto|disabled|enabled" },
-		{ NULL, NULL },
-	};
-	cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
-}
-
-void retro_set_audio_sample(retro_audio_sample_t cb)
-{
-	audio_cb = cb;
-}
-
-void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb)
-{
-	audio_batch_cb = cb;
-}
-
-void retro_set_input_poll(retro_input_poll_t cb)
-{
-	input_poll_cb = cb;
-}
-
-void retro_set_input_state(retro_input_state_t cb)
-{
-	input_state_cb = cb;
-}
-
-void retro_set_video_refresh(retro_video_refresh_t cb)
-{
-	video_cb = cb;
-}
-
-void *retro_get_memory_data(unsigned type)
+void *Get_memory_data(unsigned type)
 {
    switch (type)
    {
@@ -715,7 +489,7 @@ void *retro_get_memory_data(unsigned type)
    return NULL;
 }
 
-size_t retro_get_memory_size(unsigned type)
+size_t Get_memory_size(unsigned type)
 {
    switch (type)
    {
@@ -734,54 +508,6 @@ size_t retro_get_memory_size(unsigned type)
 
    return 0;
 }
-
-
-int16_t retro_input_state_callback(unsigned port, unsigned device, unsigned index, unsigned id)
-{
-	if (port != 0)
-	{
-		return 0;
-	}
-}
-
-void retro_input_poll_callback()
-{
-
-}
-
-size_t retro_audio_sample_batch_callback(const int16_t *data, size_t frames)
-{
-	PaError err = Pa_WriteStream( apu_stream, data, frames);
-	return frames;
-}
-
-
-
-
-/***
- * Callback for updating the libretro environment.
- */
-int retro_environment_callback(unsigned cmd, void *data)
-{
-    // TODO: do something with this data...
-    // Also, retro_init() doesn't work if I just
-    // put a return here, hence the stupid printf.
-
-    return 0;
-}
-
-/***
- * Sets up all of our appropriate callback functions with libretro.
- */
-void setup_callbacks()
-{
-    retro_set_environment(&retro_environment_callback);
-    retro_set_video_refresh(&retro_video_refresh_callback);
-    retro_set_input_poll(&retro_input_poll_callback);
-    retro_set_input_state(&retro_input_state_callback);
-    retro_set_audio_sample_batch(&retro_audio_sample_batch_callback);
-}
-
 
 static uint32_t Sound_Init()
 {
@@ -808,15 +534,10 @@ static uint32_t Sound_Init()
 	return 1;
 }
 
-extern void WSwan_GfxSaveState(uint32_t load, FILE* fp);
-
 int main(int argc, char* argv[])
 {
-	struct retro_game_info game;
 	uint32_t start;
 	int isloaded;
-	FILE* fp;
-	uint32_t size_rom;
 	
     printf("Starting Oswan\n");
     
@@ -830,44 +551,20 @@ int main(int argc, char* argv[])
 	SDL_ShowCursor(0);
 	
     screen = SDL_SetVideoMode(224, 144, 16, SDL_HWSURFACE);
-
-    setup_callbacks();
 	
 	Sound_Init();
 
-	/* Retroarch core expects the game to be already loaded in memory.
-	 * This isn't done by the core itself hence why the following lines 
-	 * of codes are needed.
-	 * */
-
-    fp = fopen(argv[1], "rb");
-    
-    fseek (fp, 0, SEEK_END);
-    size_rom = ftell (fp);
-    
-    buf_rom = malloc(size_rom);
-    
-	fseek (fp, 0, SEEK_SET);
-	fread (buf_rom,1,size_rom,fp);
-	
-    fclose (fp);
-    
-    game.path = argv[1];
-    game.meta = NULL;
-    game.data = buf_rom;
-    game.size = size_rom;
-
-	isloaded = retro_load_game(&game);
+	isloaded = Load_Game(argv[1]);
 	if (!isloaded)
 	{
 		printf("Could not load ROM in memory\n");
 		return 0;
 	}
 	
-    fp = fopen("klonoa.epm", "rb");
+    /*fp = fopen("klonoa.epm", "rb");
     if (fp)
     {
-		fread(retro_get_memory_data(0), sizeof(uint8_t), retro_get_memory_size(0), fp);
+		fread(Get_memory_data(0), sizeof(uint8_t), Get_memory_size(0), fp);
 		fclose(fp);
 	}
     
@@ -882,25 +579,23 @@ int main(int argc, char* argv[])
 		WSwan_SoundSaveState(1, fp);
 		WSwan_EEPROMSaveState(1, fp);
 		fclose(fp);
-	}
+	}*/
 	
 	done = 0;
     
     // get the game ready
     while (!done)
     {
-		retro_run();
+		Run_Emulator();
 
-		memcpy(screen->pixels, surf->pixels, (224*144)*2);
 		
-		/* This needs to be switched to something better on the RS-97 */
 		SDL_Flip(screen);
     }
     
-    fp = fopen("klonoa.epm", "wb");
+    /*fp = fopen("klonoa.epm", "wb");
 	if (fp)
 	{
-		fwrite(retro_get_memory_data(0), sizeof(uint8_t), retro_get_memory_size(0), fp);
+		fwrite(Get_memory_data(0), sizeof(uint8_t), Get_memory_size(0), fp);
 		fclose(fp);
 	}
 	
@@ -914,8 +609,7 @@ int main(int argc, char* argv[])
 		WSwan_InterruptSaveState(0, fp);
 		WSwan_SoundSaveState(0, fp);
 		WSwan_EEPROMSaveState(0, fp);
-		fclose(fp);
-	}
+		*/
 	//Deinit();
 
     SDL_FreeSurface(screen);

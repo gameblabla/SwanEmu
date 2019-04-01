@@ -26,7 +26,7 @@ static uint32_t ClockCycleCounter;
 static uint8_t wsCA15;
 static uint8_t Command, Data;
 
-void WSwan_RTCWrite(uint32 A, uint8 V)
+void WSwan_RTCWrite(uint32_t A, uint8_t V)
 {
    switch(A)
    {
@@ -41,7 +41,7 @@ void WSwan_RTCWrite(uint32 A, uint8 V)
    }
 }
 
-uint8 WSwan_RTCRead(uint32 A)
+uint8_t WSwan_RTCRead(uint32_t A)
 {
    time_t long_time;
    struct tm *newtime;
@@ -96,7 +96,7 @@ void WSwan_RTCReset(void)
    wsCA15 = 0;
 }
 
-void WSwan_RTCClock(uint32 cycles)
+void WSwan_RTCClock(uint32_t cycles)
 {
    ClockCycleCounter += cycles;
    while(ClockCycleCounter >= 3072000)

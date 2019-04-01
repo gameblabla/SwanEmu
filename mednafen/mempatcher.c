@@ -27,12 +27,12 @@ static uint8_t **RAMPtrs = NULL;
 static uint32_t PageSize;
 static uint32_t NumPages;
 
-uint32_t MDFNMP_Init(uint32 ps, uint32 numpages)
+uint32_t MDFNMP_Init(uint32_t ps, uint32_t numpages)
 {
 	PageSize = ps;
 	NumPages = numpages;
 
-	RAMPtrs = (uint8 **)calloc(numpages, sizeof(uint8 *));
+	RAMPtrs = (uint8_t **)calloc(numpages, sizeof(uint8_t *));
 	
 	return 1;
 }
@@ -46,9 +46,9 @@ void MDFNMP_Kill(void)
 	}
 }
 
-void MDFNMP_AddRAM(uint32 size, uint32 A, uint8 *RAM)
+void MDFNMP_AddRAM(uint32_t size, uint32_t A, uint8_t *RAM)
 {
-	uint32 AB = A / PageSize;
+	uint32_t AB = A / PageSize;
 	size /= PageSize;
 	
 	for(unsigned int x = 0; x < size; x++)

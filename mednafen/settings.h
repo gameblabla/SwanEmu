@@ -3,8 +3,8 @@
 
 #include <string.h>
 
-uint64 MDFN_GetSettingUI(const char *name);
-int64 MDFN_GetSettingI(const char *name);
+uint64_t MDFN_GetSettingUI(const char *name);
+int64_t MDFN_GetSettingI(const char *name);
 uint32_t MDFN_GetSettingB(const char *name);
 const char *MDFN_GetSettingS(const char *name);
 #endif

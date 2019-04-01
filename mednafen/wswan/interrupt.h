@@ -14,8 +14,8 @@ enum
 };
 
 void WSwan_Interrupt(int);
-void WSwan_InterruptWrite(uint32 A, uint8 V);
-uint8 WSwan_InterruptRead(uint32 A);
+void WSwan_InterruptWrite(uint32_t A, uint8_t V);
+uint8_t WSwan_InterruptRead(uint32_t A);
 void WSwan_InterruptCheck(void);
 void WSwan_InterruptReset(void);
 void WSwan_InterruptDebugForce(unsigned int level);
