@@ -1,25 +1,3 @@
-#include "mednafen/mednafen.h"
-#include "mednafen/mempatcher.h"
-#include "mednafen/git.h"
-
-#include "mednafen/wswan/gfx.h"
-
-#include <SDL/SDL.h>
-#include <portaudio.h>
-
-PaStream *apu_stream;
-
-static uint32_t game;
-
-static double last_sound_rate;
-
-static uint8_t rotate_tall;
-static uint8_t select_pressed_last_frame;
-
-static unsigned rotate_joymap;
-
-uint32_t done = 0;
-char* buf_rom;
 
 /* Cygne
  *
@@ -40,31 +18,36 @@ char* buf_rom;
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
-
-#include "mednafen/wswan/wswan.h"
-#include "mednafen/mempatcher.h"
-
-#include <sys/types.h>
+ 
 #include <SDL/SDL.h>
-
+#include <portaudio.h>
+#include <sys/types.h>
+#include "mednafen/mednafen.h"
+#include "mednafen/mempatcher.h"
 #include "mednafen/wswan/gfx.h"
 #include "mednafen/wswan/wswan-memory.h"
 #include "mednafen/wswan/start.inc"
 #include "mednafen/wswan/sound.h"
+#include "mednafen/wswan/interrupt.h"
 #include "mednafen/wswan/v30mz.h"
 #include "mednafen/wswan/rtc.h"
+#include "mednafen/wswan/gfx.h"
 #include "mednafen/wswan/eeprom.h"
 
+PaStream *apu_stream;
+
+static uint8_t rotate_tall;
+static uint8_t select_pressed_last_frame;
+
+static unsigned rotate_joymap;
+static uint32_t done = 0;
+
 static SDL_Surface *screen;
-static uint16_t input_buf;
 
 /* Color/Mono */
-int wsc = 1;			
-uint32_t rom_size;
+uint32_t wsc = 1;			
 uint16_t WSButtonStatus;
-
-
-static uint8_t WSRCurrentSong;
+uint32_t rom_size;
 
 static void Reset(void)
 {
@@ -194,57 +177,6 @@ static void Emulate(EmulateSpecStruct *espec)
 	v30mz_timestamp = 0;
 }
 
-typedef struct
-{
- const uint8_t id;
- const char *name;
-} DLEntry;
-
-static const DLEntry Developers[] =
-{
-	{ 0x01, "Bandai" },
-	{ 0x02, "Taito" },
-	{ 0x03, "Tomy" },
-	{ 0x04, "Koei" },
-	{ 0x05, "Data East" },
-	{ 0x06, "Asmik" }, // Asmik Ace?
-	{ 0x07, "Media Entertainment" },
-	{ 0x08, "Nichibutsu" },
-	{ 0x0A, "Coconuts Japan" },
-	{ 0x0B, "Sammy" },
-	{ 0x0C, "Sunsoft" },
-	{ 0x0D, "Mebius" },
-	{ 0x0E, "Banpresto" },
-	{ 0x10, "Jaleco" },
-	{ 0x11, "Imagineer" },
-	{ 0x12, "Konami" },
-	{ 0x16, "Kobunsha" },
-	{ 0x17, "Bottom Up" },
-	{ 0x18, "Kaga Tech" },
-	{ 0x19, "Sunrise" },
-	{ 0x1A, "Cyber Front" },
-	{ 0x1B, "Mega House" },
-	{ 0x1D, "Interbec" },
-	{ 0x1E, "Nihon Application" },
-	{ 0x1F, "Bandai Visual" },
-	{ 0x20, "Athena" },
-	{ 0x21, "KID" },
-	{ 0x22, "HAL Corporation" },
-	{ 0x23, "Yuki Enterprise" },
-	{ 0x24, "Omega Micott" },
-	{ 0x25, "Layup" },
-	{ 0x26, "Kadokawa Shoten" },
-	{ 0x27, "Shall Luck" },
-	{ 0x28, "Squaresoft" },
-	{ 0x2B, "Tom Create" },
-	{ 0x2D, "Namco" },
-	{ 0x2E, "Movic" }, // ????
-	{ 0x2F, "E3 Staff" }, // ????
-	{ 0x31, "Vanguard" },
-	{ 0x32, "Megatron" },
-	{ 0x33, "Wiz" },
-	{ 0x36, "Capcom" }
-};
 
 static uint32_t SRAMSize;
 
@@ -261,41 +193,42 @@ static INLINE uint32_t next_pow2(uint32_t v)
 	return v;
 }
 
-static int Load(const uint8_t *data, size_t size)
+static uint32_t Load_Game(char* path)
 {
+	FILE* fp;
 	uint32_t pow_size      = 0;
 	uint32_t real_rom_size = 0;
 	uint8_t header[10];
-
-	if(size < 65536)
+	
+	uint32_t size;
+	
+	fp = fopen(path, "rb");
+    fseek (fp, 0, SEEK_END);
+    size = ftell (fp);
+    
+    /* Invalid Wonderswan ROM, too small */
+	if (size < 65536)
+	{
 		return(0);
+	}
+	
+	fseek (fp, 0, SEEK_SET);
 
 	real_rom_size = (size + 0xFFFF) & ~0xFFFF;
 	pow_size      = next_pow2(real_rom_size);
 	rom_size      = pow_size + (pow_size == 0);
 
-	wsCartROM     = (uint8_t *)calloc(1, rom_size);
-
+	wsCartROM     = (uint8_t *)calloc(1, size);
+	
 	/* This real_rom_size vs rom_size funny business is intended primarily for handling WSR files. */
 	if(real_rom_size < rom_size)
 		memset(wsCartROM, 0xFF, rom_size - real_rom_size);
 
-	memcpy(wsCartROM + (rom_size - real_rom_size), data, size);
-
+	fread (wsCartROM, sizeof(uint8_t), size, fp);
+	
+	fclose (fp);
+	
 	memcpy(header, wsCartROM + rom_size - 10, 10);
-
-	{
-		const char *developer_name = "???";
-		for(unsigned int x = 0; x < sizeof(Developers) / sizeof(DLEntry); x++)
-		{
-			if(Developers[x].id == header[0])
-			{
-				developer_name = Developers[x].name;
-				break;
-			}
-		}
-		printf("Developer: %s (0x%02x)\n", developer_name, header[0]);
-	}
 
 	SRAMSize = 0;
 	eeprom_size = 0;
@@ -355,7 +288,7 @@ static int Load(const uint8_t *data, size_t size)
 	MDFNMP_Init(16384, (1 << 20) / 1024);
 
 	v30mz_init(WSwan_readmem20, WSwan_writemem20, WSwan_readport, WSwan_writeport);
-	WSwan_MemoryInit(MDFN_GetSettingB("wswan.language"), wsc, SRAMSize, false); // EEPROM and SRAM are loaded in this func.
+	WSwan_MemoryInit(MDFN_GetSettingB("wswan.language"), wsc, SRAMSize, 0); // EEPROM and SRAM are loaded in this func.
 	WSwan_GfxInit();
 	//MDFNGameInfo->fps = (uint32)((uint64)3072000 * 65536 * 256 / (159*256));
 
@@ -381,13 +314,6 @@ static void CloseGame(void)
 	}
 }
 
-static uint32_t MDFNI_LoadGame(const char *force_module, const uint8_t *data, size_t size)
-{
-	if(Load(data, size) <= 0)
-		return 0;
-	return 1;
-}
-
 static void MDFNI_CloseGame(void)
 {
 	CloseGame();
@@ -400,45 +326,9 @@ void WS_reset(void)
 	Reset();
 }
 
-static uint8_t Load_Game(char* path)
-{
-	FILE* fp;
-	uint32_t size_rom;
-   
-	fp = fopen(path, "rb");
-    
-    fseek (fp, 0, SEEK_END);
-    size_rom = ftell (fp);
-    
-    buf_rom = malloc(size_rom);
-    
-	fseek (fp, 0, SEEK_SET);
-	fread (buf_rom,1,size_rom,fp);
-	
-    fclose (fp);
-    
-	game = MDFNI_LoadGame("wswan", (const uint8_t*)buf_rom, size_rom);
-	if (!game)
-	{
-		printf("Failed to load game ROM\n");
-		return false;
-	}
-   
-	rotate_tall = false;
-	select_pressed_last_frame = false;
-	rotate_joymap = 0;
-
-	WSwan_SetPixelFormat();
-
-	return true;
-}
-
 void Unload_game()
 {
-   if (!game)
-      return;
-
-   MDFNI_CloseGame();
+	MDFNI_CloseGame();
 }
 
 
@@ -458,15 +348,13 @@ static void Run_Emulator(void)
 
 	Emulate(&spec);
 
-	int16_t *const SoundBuf = spec.SoundBuf + spec.SoundBufSizeALMS * 2;
 	int32_t SoundBufSize = spec.SoundBufSize - spec.SoundBufSizeALMS;
-	const int32_t SoundBufMaxSize = spec.SoundBufMaxSize - spec.SoundBufSizeALMS;
 
 	spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
 
 	video_frames++;
 	audio_frames += spec.SoundBufSize;
-	PaError err = Pa_WriteStream( apu_stream, spec.SoundBuf, spec.SoundBufSize);
+	Pa_WriteStream( apu_stream, spec.SoundBuf, spec.SoundBufSize);
 }
 
 void *Get_memory_data(unsigned type)
@@ -509,10 +397,66 @@ size_t Get_memory_size(unsigned type)
    return 0;
 }
 
+void EEPROM_file(char* path, uint32_t state)
+{
+	FILE* fp;
+	if (state == 1)
+	{
+		fp = fopen(path, "rb");
+		if (fp)
+		{
+			fread(Get_memory_data(0), sizeof(uint8_t), Get_memory_size(0), fp);
+			fclose(fp);
+		}
+	}
+	else
+	{
+		fp = fopen(path, "wb");
+		if (fp)
+		{
+			fwrite(Get_memory_data(0), sizeof(uint8_t), Get_memory_size(0), fp);
+			fclose(fp);
+		}
+	}
+}
+
+void SaveState(char* path, uint32_t state)
+{
+	FILE* fp;
+	if (state == 1)
+	{
+		fp = fopen(path, "rb");
+		if (fp)
+		{
+			WSwan_v30mzSaveState(1, fp);
+			WSwan_MemorySaveState(1, fp);
+			WSwan_GfxSaveState(1, fp);
+			WSwan_RTCSaveState(1, fp);
+			WSwan_InterruptSaveState(1, fp);
+			WSwan_SoundSaveState(1, fp);
+			WSwan_EEPROMSaveState(1, fp);
+			fclose(fp);
+		}
+	}
+	else
+	{
+		fp = fopen(path, "wb");
+		if (fp)
+		{
+			WSwan_v30mzSaveState(0, fp);
+			WSwan_MemorySaveState(0, fp);
+			WSwan_GfxSaveState(0, fp);
+			WSwan_RTCSaveState(0, fp);
+			WSwan_InterruptSaveState(0, fp);
+			WSwan_SoundSaveState(0, fp);
+			WSwan_EEPROMSaveState(0, fp);
+		}
+	}
+}
+
 static uint32_t Sound_Init()
 {
-	int32_t err;
-	err = Pa_Initialize();
+	Pa_Initialize();
 	
 	PaStreamParameters outputParameters;
 	
@@ -528,16 +472,15 @@ static uint32_t Sound_Init()
 	outputParameters.sampleFormat = paInt16;
 	outputParameters.hostApiSpecificStreamInfo = NULL;
 	
-	err = Pa_OpenStream( &apu_stream, NULL, &outputParameters, 44100, 1024, paNoFlag, NULL, NULL);
-	err = Pa_StartStream( apu_stream );
+	Pa_OpenStream( &apu_stream, NULL, &outputParameters, 44100, 1024, paNoFlag, NULL, NULL);
+	Pa_StartStream( apu_stream );
 	
 	return 1;
 }
 
 int main(int argc, char* argv[])
 {
-	uint32_t start;
-	int isloaded;
+	uint32_t isloaded;
 	
     printf("Starting Oswan\n");
     
@@ -560,6 +503,12 @@ int main(int argc, char* argv[])
 		printf("Could not load ROM in memory\n");
 		return 0;
 	}
+   
+	rotate_tall = 0;
+	select_pressed_last_frame = 0;
+	rotate_joymap = 0;
+
+	WSwan_SetPixelFormat();
 	
     /*fp = fopen("klonoa.epm", "rb");
     if (fp)

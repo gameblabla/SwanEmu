@@ -34,8 +34,6 @@
 #include "v30mz.h"
 #include "v30mz-private.h"
 
-static uint16_t old_CS, old_IP;
-
 #define PUSH(val) \
 { \
 	I.regs.w[SP] -= 2; \
@@ -190,8 +188,9 @@ static void nec_interrupt(unsigned int_num)
 {
 	uint32_t dest_seg, dest_off;
 
-	if (int_num == -1)
-		return;
+	/* int_num is unsigned so that can't happen */
+	/*if (int_num == -1)
+		return;*/
 
 	i_real_pushf();
 	I.TF = I.IF = 0;	

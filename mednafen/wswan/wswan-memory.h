@@ -18,8 +18,8 @@ extern uint8_t wsEEPROM[2048];
 extern uint8_t *wsSRAM;
 extern uint32_t wsRAMSize;
 
-uint8_t WSwan_readmem20(uint32_t);
-void WSwan_writemem20(uint32_t address,uint8_t data);
+uint8_t WSwan_readmem20(uint32_t A);
+void WSwan_writemem20(uint32_t A, uint8_t V);
 
 void WSwan_MemoryInit(uint32_t lang, uint32_t IsWSC, uint32_t ssize, uint32_t SkipSaveLoad);
 void WSwan_MemoryKill(void);

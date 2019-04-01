@@ -135,7 +135,7 @@ void WSwan_SoundUpdate(void)
             {
                sweep_8192_divider += 8192;
                sweep_counter--;
-               if(sweep_counter <= 0)
+               if(sweep_counter == 0)
                {
                   sweep_counter = sweep_step + 1;
                   period[ch] = (period[ch] + (int8_t)sweep_value) & 0x7FF;

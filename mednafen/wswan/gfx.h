@@ -11,11 +11,11 @@ extern uint8_t	wsTCacheUpdate[512];	  //tiles cache flags
 extern uint8_t	wsTCache2[512*64];		  //tiles cache
 extern uint8_t	wsTCacheFlipped2[512*64];  	  //tiles cache (H flip)
 extern uint8_t	wsTCacheUpdate2[512];	  //tiles cache flags
-extern int		wsVMode;			  //Video Mode	
+extern uint32_t	wsVMode;			  //Video Mode	
 
 void wsMakeTiles(void);
-void wsGetTile(uint32_t,uint32_t,int,int,int);
-void wsSetVideo(int, uint32_t);
+void wsGetTile(uint32_t,uint32_t,uint32_t,uint32_t,uint32_t);
+void wsSetVideo(uint32_t, uint32_t);
 
 void wsScanline(uint16_t* restrict target);
 
@@ -34,5 +34,6 @@ void WSwan_GfxWSCPaletteRAMWrite(uint32_t ws_offset, uint8_t data);
 uint32_t wsExecuteLine(uint16_t* restrict pixels, uint8_t pitch, uint32_t skip);
 
 void WSwan_SetLayerEnableMask(uint64_t mask);
+void WSwan_GfxSaveState(uint32_t load, FILE* fp);
 
 #endif

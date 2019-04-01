@@ -144,7 +144,7 @@ long Blip_Buffer_count_samples(Blip_Buffer* bbuf,  blip_time_t t)
 	return (long)(last_sample - first_sample);
 }
 
-void Blip_Buffer_remove_samples(Blip_Buffer* bbuf,  long count)
+void Blip_Buffer_remove_samples(Blip_Buffer* bbuf, long count)
 {
 	if (count)
 	{
@@ -153,8 +153,8 @@ void Blip_Buffer_remove_samples(Blip_Buffer* bbuf,  long count)
 
 		// copy remaining samples to beginning and clear old samples
 		remain = Blip_Buffer_samples_avail(bbuf) + blip_buffer_extra_;
-		memmove(bbuf->buffer, bbuf->buffer + count, remain * sizeof(bbuf->buffer));
-		memset(bbuf->buffer + remain, 0, count * sizeof(bbuf->buffer));
+		memmove(bbuf->buffer, bbuf->buffer + count, remain * sizeof(blip_buf_t_));
+		memset(bbuf->buffer + remain, 0, count * sizeof(blip_buf_t_));
 	}
 }
 

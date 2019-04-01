@@ -225,7 +225,7 @@ void WSwan_writeport(uint32_t IOPort, uint8_t V)
 
 	if(IOPort >= 0x80 && IOPort <= 0x9F)
 		WSwan_SoundWrite(IOPort, V);
-	else if((IOPort >= 0x00 && IOPort <= 0x3F) || (IOPort >= 0xA0 && IOPort <= 0xAF) || (IOPort == 0x60))
+	else if((IOPort <= 0x3F) || (IOPort >= 0xA0 && IOPort <= 0xAF) || (IOPort == 0x60))
 		WSwan_GfxWrite(IOPort, V);
 	else if((IOPort >= 0xBA && IOPort <= 0xBE) || (IOPort >= 0xC4 && IOPort <= 0xC8))
 		WSwan_EEPROMWrite(IOPort, V);

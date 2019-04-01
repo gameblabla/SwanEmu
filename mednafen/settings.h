@@ -1,6 +1,6 @@
 #ifndef MDFN_SETTINGS_H
 #define MDFN_SETTINGS_H
-
+#include <stdint.h>
 #include <string.h>
 
 uint64_t MDFN_GetSettingUI(const char *name);
