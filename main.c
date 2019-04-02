@@ -19,7 +19,6 @@
  */
  
 #include <SDL/SDL.h>
-#include <portaudio.h>
 #include <sys/types.h>
 #include "mednafen/mednafen.h"
 #include "mednafen/mempatcher.h"
@@ -32,8 +31,6 @@
 #include "mednafen/wswan/rtc.h"
 #include "mednafen/wswan/gfx.h"
 #include "mednafen/wswan/eeprom.h"
-
-PaStream *apu_stream;
 
 static uint8_t rotate_tall;
 static uint8_t select_pressed_last_frame;
@@ -54,6 +51,9 @@ uint32_t rom_size;
 #include <unistd.h>
 #include <sys/soundcard.h>
 static int32_t oss_audio_fd = -1;
+#else
+#include <portaudio.h>
+PaStream *apu_stream;
 #endif
 
 static void Reset(void)
@@ -71,7 +71,7 @@ static void Reset(void)
 	{
 		if(u0 != 0xC4 && u0 != 0xC5 && u0 != 0xBA && u0 != 0xBB)
 		{
-         WSwan_writeport(u0,startio[u0]);
+			WSwan_writeport(u0,startio[u0]);
 		}
 	}
 
@@ -170,14 +170,38 @@ static int32_t update_input(void)
 }
 
 
+
+#ifdef FRAMESKIP
+static uint32_t Timer_Read(void) 
+{
+	/* Timing. */
+	struct timeval tval;
+  	gettimeofday(&tval, 0);
+	return (((tval.tv_sec*1000000) + (tval.tv_usec)));
+}
+static long lastTick = 0, newTick;
+static int32_t FPS = 75, video_frames = 0, SkipCnt = 0, FrameSkip; 
+static const uint32_t TblSkip[5][5] = {
+    {0,0,0,0,0},
+    {1,0,0,0,0},
+    {1,0,1,0,0},
+    {1,1,0,1,0},
+    {1,1,1,1,0},
+};
+#endif
+
+
 static void Emulate(EmulateSpecStruct *espec)
 {
 	WSButtonStatus = update_input();
- 
-	while(!wsExecuteLine(screen->pixels, screen->w, 0))
-	{
 
-	}
+#ifdef FRAMESKIP
+	SkipCnt--;
+	if (SkipCnt < 0) SkipCnt = 4;
+	while(!wsExecuteLine(screen->pixels, screen->w, TblSkip[FrameSkip][SkipCnt] ));
+#else
+	while(!wsExecuteLine(screen->pixels, screen->w, 0 ));
+#endif
 	
 	espec->SoundBufSize = WSwan_SoundFlush(espec->SoundBuf, espec->SoundBufMaxSize);
 
@@ -340,8 +364,6 @@ void Unload_game()
 }
 
 
-static uint64_t video_frames, audio_frames;
-
 static void Run_Emulator(void)
 {
 	static int16_t sound_buf[0x10000];
@@ -360,8 +382,20 @@ static void Run_Emulator(void)
 
 	spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
 
+#ifdef FRAMESKIP
 	video_frames++;
-	audio_frames += spec.SoundBufSize;
+	newTick = Timer_Read();
+	if ( (newTick-lastTick) > 1000000) 
+	{
+		FPS = video_frames;
+		video_frames = 0;
+		lastTick = newTick;
+	}
+	FrameSkip = 75 / FPS;
+	if (FrameSkip < 0) FrameSkip = 0;
+	else if (FrameSkip > 4) FrameSkip = 4;
+#endif
+
 #ifdef OSS_SOUND
 	write(oss_audio_fd, spec.SoundBuf, spec.SoundBufSize * 4 );
 #else
