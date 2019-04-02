@@ -1,5 +1,5 @@
-#ifndef __V30MZ_H_
-#define __V30MZ_H_
+#ifndef V30MZ_H_
+#define V30MZ_H_
 
 enum
 {

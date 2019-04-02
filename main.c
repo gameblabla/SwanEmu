@@ -1,4 +1,3 @@
-
 /* Cygne
  *
  * Copyright notice for this file:
@@ -49,26 +48,35 @@ uint32_t wsc = 1;
 uint16_t WSButtonStatus;
 uint32_t rom_size;
 
+#ifdef OSS_SOUND
+#include <sys/ioctl.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/soundcard.h>
+static int32_t oss_audio_fd = -1;
+#endif
+
 static void Reset(void)
 {
-   int u0;
+	int u0;
+	v30mz_reset();				/* Reset CPU */
+	WSwan_MemoryReset();
+	WSwan_GfxReset();
+	WSwan_SoundReset();
+	WSwan_InterruptReset();
+	WSwan_RTCReset();
+	WSwan_EEPROMReset();
 
-   v30mz_reset();				/* Reset CPU */
-   WSwan_MemoryReset();
-   WSwan_GfxReset();
-   WSwan_SoundReset();
-   WSwan_InterruptReset();
-   WSwan_RTCReset();
-   WSwan_EEPROMReset();
-
-   for(u0=0;u0<0xc9;u0++)
-   {
-      if(u0 != 0xC4 && u0 != 0xC5 && u0 != 0xBA && u0 != 0xBB)
+	for(u0=0;u0<0xc9;u0++)
+	{
+		if(u0 != 0xC4 && u0 != 0xC5 && u0 != 0xBA && u0 != 0xBB)
+		{
          WSwan_writeport(u0,startio[u0]);
-   }
+		}
+	}
 
-   v30mz_set_reg(NEC_SS,0);
-   v30mz_set_reg(NEC_SP,0x2000);
+	v30mz_set_reg(NEC_SS,0);
+	v30mz_set_reg(NEC_SP,0x2000);
 }
 
 
@@ -166,7 +174,7 @@ static void Emulate(EmulateSpecStruct *espec)
 {
 	WSButtonStatus = update_input();
  
-	while(!wsExecuteLine(screen->pixels,screen->w, 0))
+	while(!wsExecuteLine(screen->pixels, screen->w, 0))
 	{
 
 	}
@@ -354,7 +362,11 @@ static void Run_Emulator(void)
 
 	video_frames++;
 	audio_frames += spec.SoundBufSize;
+#ifdef OSS_SOUND
+	write(oss_audio_fd, spec.SoundBuf, spec.SoundBufSize * 4 );
+#else
 	Pa_WriteStream( apu_stream, spec.SoundBuf, spec.SoundBufSize);
+#endif
 }
 
 void *Get_memory_data(unsigned type)
@@ -456,6 +468,39 @@ void SaveState(char* path, uint32_t state)
 
 static uint32_t Sound_Init()
 {
+#ifdef OSS_SOUND
+	uint32_t channels = 2;
+	uint32_t format = AFMT_S16_LE;
+	uint32_t tmp = 44100;
+	int32_t err_ret;
+
+	oss_audio_fd = open("/dev/dsp", O_WRONLY);
+	if (oss_audio_fd < 0)
+	{
+		printf("Couldn't open /dev/dsp.\n");
+		return 1;
+	}
+	
+	err_ret = ioctl(oss_audio_fd, SNDCTL_DSP_SPEED,&tmp);
+	if (err_ret == -1)
+	{
+		printf("Could not set sound frequency\n");
+		return 1;
+	}
+	err_ret = ioctl(oss_audio_fd, SNDCTL_DSP_CHANNELS, &channels);
+	if (err_ret == -1)
+	{
+		printf("Could not set channels\n");
+		return 1;
+	}
+	err_ret = ioctl(oss_audio_fd, SNDCTL_DSP_SETFMT, &format);
+	if (err_ret == -1)
+	{
+		printf("Could not set sound format\n");
+		return 1;
+	}
+	return 0;
+#else
 	Pa_Initialize();
 	
 	PaStreamParameters outputParameters;
@@ -474,6 +519,7 @@ static uint32_t Sound_Init()
 	
 	Pa_OpenStream( &apu_stream, NULL, &outputParameters, 44100, 1024, paNoFlag, NULL, NULL);
 	Pa_StartStream( apu_stream );
+#endif
 	
 	return 1;
 }
@@ -510,26 +556,6 @@ int main(int argc, char* argv[])
 
 	WSwan_SetPixelFormat();
 	
-    /*fp = fopen("klonoa.epm", "rb");
-    if (fp)
-    {
-		fread(Get_memory_data(0), sizeof(uint8_t), Get_memory_size(0), fp);
-		fclose(fp);
-	}
-    
-    fp = fopen("klonoa.sts", "rb");
-    if (fp)
-    {
-		WSwan_v30mzSaveState(1, fp);
-		WSwan_MemorySaveState(1, fp);
-		WSwan_GfxSaveState(1, fp);
-		WSwan_RTCSaveState(1, fp);
-		WSwan_InterruptSaveState(1, fp);
-		WSwan_SoundSaveState(1, fp);
-		WSwan_EEPROMSaveState(1, fp);
-		fclose(fp);
-	}*/
-	
 	done = 0;
     
     // get the game ready
@@ -541,24 +567,13 @@ int main(int argc, char* argv[])
 		SDL_Flip(screen);
     }
     
-    /*fp = fopen("klonoa.epm", "wb");
-	if (fp)
+#ifdef OSS_SOUND
+	if (oss_audio_fd >= 0)
 	{
-		fwrite(Get_memory_data(0), sizeof(uint8_t), Get_memory_size(0), fp);
-		fclose(fp);
+		close(oss_audio_fd);
+		oss_audio_fd = -1;
 	}
-	
-    fp = fopen("klonoa.sts", "wb");
-	if (fp)
-	{
-		WSwan_v30mzSaveState(0, fp);
-		WSwan_MemorySaveState(0, fp);
-		WSwan_GfxSaveState(0, fp);
-		WSwan_RTCSaveState(0, fp);
-		WSwan_InterruptSaveState(0, fp);
-		WSwan_SoundSaveState(0, fp);
-		WSwan_EEPROMSaveState(0, fp);
-		*/
+#endif
 	//Deinit();
 
     SDL_FreeSurface(screen);

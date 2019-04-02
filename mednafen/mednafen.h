@@ -1,5 +1,5 @@
-#ifndef _MEDNAFEN_H
-#define _MEDNAFEN_H
+#ifndef MEDNAFEN_H
+#define MEDNAFEN_H
 
 #include <stdio.h>
 #include <stdlib.h>

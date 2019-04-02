@@ -1,5 +1,5 @@
-#ifndef __WSWAN_SOUND_H
-#define __WSWAN_SOUND_H
+#ifndef WSWAN_SOUND_H
+#define WSWAN_SOUND_H
 
 #include <stdint.h>
 

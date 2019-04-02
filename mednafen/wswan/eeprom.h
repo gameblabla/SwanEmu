@@ -1,5 +1,5 @@
-#ifndef __WSWAN_EEPROM_H
-#define __WSWAN_EEPROM_H
+#ifndef WSWAN_EEPROM_H
+#define WSWAN_EEPROM_H
 
 #include <stdint.h>
 

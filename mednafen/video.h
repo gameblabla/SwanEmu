@@ -1,5 +1,5 @@
-#ifndef __MDFN_VIDEO_H
-#define __MDFN_VIDEO_H
+#ifndef MDFN_VIDEO_H
+#define MDFN_VIDEO_H
 
 #include <stdint.h>
 

@@ -1,5 +1,5 @@
-#ifndef __WSWAN_H
-#define __WSWAN_H
+#ifndef WSWAN_H
+#define WSWAN_H
 
 #include "../mednafen.h"
 

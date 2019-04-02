@@ -1,5 +1,5 @@
-#ifndef __WSWAN_GFX_H
-#define __WSWAN_GFX_H
+#ifndef WSWAN_GFX_H
+#define WSWAN_GFX_H
 
 
 void WSWan_TCacheInvalidByAddr(uint32_t);

@@ -1,5 +1,5 @@
-#ifndef __WSWAN_INTERRUPT_H
-#define __WSWAN_INTERRUPT_H
+#ifndef WSWAN_INTERRUPT_H
+#define WSWAN_INTERRUPT_H
 
 enum
 {

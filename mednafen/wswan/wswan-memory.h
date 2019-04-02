@@ -1,5 +1,5 @@
-#ifndef __WSWAN_MEMORY_H
-#define __WSWAN_MEMORY_H
+#ifndef WSWAN_MEMORY_H
+#define WSWAN_MEMORY_H
 
 #include <stdint.h>
 

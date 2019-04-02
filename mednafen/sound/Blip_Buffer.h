@@ -136,7 +136,7 @@ typedef struct
 
 static INLINE void Blip_Synth_set_volume(Blip_Synth* synth, float v, int range)
 {
-	synth->delta_factor = ((v * (1.0 / (range < 0 ? -range : range))) * (1L << blip_sample_bits) + 0.5);
+	synth->delta_factor = ((v * (1.0f / (range < 0 ? -range : range))) * (1L << blip_sample_bits) + 0.5f);
 }
 // Works directly in terms of fractional output samples. Contact author for more info.
 static INLINE void Blip_Synth_offset_resampled(Blip_Synth* synth, blip_resampled_time_t,

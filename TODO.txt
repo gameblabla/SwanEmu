@@ -1,8 +1,1 @@
-- Commented out save states due to issues during C++ -> C conversion 
-
-- Remove libretro's specific code.
-
-Should be easy enough and it's only a few lines now.
-We'll stick to it though until the other issues are fixed.
-
-
+- Proper frameskipping ?
