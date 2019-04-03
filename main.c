@@ -18,7 +18,11 @@
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
  
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
 #include <SDL/SDL.h>
+#include <sys/time.h>
 #include <sys/types.h>
 #include "mednafen/mednafen.h"
 #include "mednafen/mempatcher.h"
@@ -180,13 +184,12 @@ static uint32_t Timer_Read(void)
 	return (((tval.tv_sec*1000000) + (tval.tv_usec)));
 }
 static long lastTick = 0, newTick;
-static int32_t FPS = 75, video_frames = 0, SkipCnt = 0, FrameSkip; 
+static uint32_t SkipCnt = 0, video_frames = 0, FPS = 75, FrameSkip;
 static const uint32_t TblSkip[5][5] = {
-    {0,0,0,0,0},
-    {1,0,0,0,0},
-    {1,0,1,0,0},
-    {1,1,0,1,0},
-    {1,1,1,1,0},
+    {0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 1},
+    {0, 0, 1, 1, 1},
+    {0, 1, 1, 1, 1},
 };
 #endif
 
@@ -196,8 +199,8 @@ static void Emulate(EmulateSpecStruct *espec)
 	WSButtonStatus = update_input();
 
 #ifdef FRAMESKIP
-	SkipCnt--;
-	if (SkipCnt < 0) SkipCnt = 4;
+	SkipCnt++;
+	if (SkipCnt > 4) SkipCnt = 0;
 	while(!wsExecuteLine(screen->pixels, screen->w, TblSkip[FrameSkip][SkipCnt] ));
 #else
 	while(!wsExecuteLine(screen->pixels, screen->w, 0 ));
@@ -372,8 +375,6 @@ static void Run_Emulator(void)
 	spec.SoundRate = 44100;
 	spec.SoundBuf = sound_buf;
 	spec.SoundBufMaxSize = sizeof(sound_buf) / 2;
-	spec.SoundVolume = 1.0;
-	spec.soundmultiplier = 1.0;
 	spec.SoundBufSize = 0;
 
 	Emulate(&spec);
@@ -392,8 +393,8 @@ static void Run_Emulator(void)
 		lastTick = newTick;
 	}
 	FrameSkip = 75 / FPS;
-	if (FrameSkip < 0) FrameSkip = 0;
-	else if (FrameSkip > 4) FrameSkip = 4;
+	if (FrameSkip > 4) FrameSkip = 4;
+	if (FPS >= 75) FrameSkip = 0;
 #endif
 
 #ifdef OSS_SOUND

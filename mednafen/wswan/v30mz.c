@@ -629,7 +629,7 @@ static void DoOP(uint8_t opcode)
          OP( 0x99, i_cwd       ) { I.regs.w[DW] = (I.regs.b[AH] & 0x80) ? 0xffff : 0;	CLK(1);	} OP_EPILOGUE;
 
          OP( 0x9a, i_call_far  ) { uint32_t tmp, tmp2;	FETCHuint16(tmp); FETCHuint16(tmp2); PUSH(I.sregs[PS]); PUSH(I.pc); I.pc = (uint16_t)tmp; I.sregs[PS] = (uint16_t)tmp2; ADDBRANCHTRACE(I.sregs[PS], I.pc); CLK(10); } OP_EPILOGUE;
-         OP( 0x9b, i_poll      ) { puts("POLL"); } OP_EPILOGUE;
+         OP( 0x9b, i_poll      ) { /*puts("POLL");*/ } OP_EPILOGUE;
          OP( 0x9c, i_pushf     ) { i_real_pushf(); } OP_EPILOGUE;
          OP( 0x9d, i_popf      ) { i_real_popf();  } OP_EPILOGUE;
          OP( 0x9e, i_sahf      ) { uint32_t tmp = (CompressFlags() & 0xff00) | (I.regs.b[AH] & 0xd5); ExpandFlags(tmp); CLK(4); } OP_EPILOGUE;

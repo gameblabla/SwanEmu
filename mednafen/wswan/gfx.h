@@ -25,7 +25,7 @@ extern uint32_t	dx_bits,dx_pitch,cmov,dx_linewidth_blit,dx_buffer_line;
 
 void WSwan_SetPixelFormat(void);
 
-void WSwan_GfxInit(void);
+void WSwan_GfxInit(void) SWANEMU_COLD;
 void WSwan_GfxReset(void);
 void WSwan_GfxWrite(uint32_t A, uint8_t V);
 uint8_t WSwan_GfxRead(uint32_t A);

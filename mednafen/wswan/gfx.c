@@ -440,10 +440,10 @@ void wsScanline(uint16_t* restrict target)
                   in_window[7 + j] = 1;
             }
          }
-         else
+         /*else
          {
             puts("Who knows!");
-         }
+         }*/
       }
       else
          memset(in_window, 1, sizeof(in_window));

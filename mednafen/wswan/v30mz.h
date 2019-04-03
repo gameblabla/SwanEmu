@@ -28,7 +28,7 @@ void v30mz_execute(int cycles);
 void v30mz_set_reg(int, unsigned);
 unsigned v30mz_get_reg(int regnum);
 void v30mz_reset(void);
-void v30mz_init(uint8_t (*readmem20)(uint32_t), void (*writemem20)(uint32_t,uint8_t), uint8_t (*readport)(uint32_t), void (*writeport)(uint32_t, uint8_t));
+void v30mz_init(uint8_t (*readmem20)(uint32_t), void (*writemem20)(uint32_t,uint8_t), uint8_t (*readport)(uint32_t), void (*writeport)(uint32_t, uint8_t)) SWANEMU_COLD;
 
 void v30mz_int(uint32_t vector, uint32_t IgnoreIF);
 

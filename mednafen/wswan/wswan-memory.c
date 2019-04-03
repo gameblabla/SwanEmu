@@ -86,7 +86,7 @@ uint8_t WSwan_readmem20(uint32_t A)
 {
    uint8_t bank_num;
    uint32_t offset = A & 0xFFFF;
-   uint32_t bank   = (A >> 16) & 0xF;
+   uint32_t bank = (A >> 16) & 0xF;
 
    switch(bank)
    {

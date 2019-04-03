@@ -7,6 +7,12 @@
 
 #include "settings.h"
 
+#ifdef __GNUC__
+#define SWANEMU_COLD __attribute__((cold))
+#else
+#define SWANEMU_COLD 
+#endif
+
 enum
 {
 	MDFN_ROTATE0 = 0,
@@ -40,17 +46,6 @@ typedef struct
 	// Number of cycles that this frame consumed, using MDFNGI::MasterClock as a time base.
 	// Set by emulation code.
 	int64_t MasterCycles;
-
-
-	// Current sound volume(0.000...<=volume<=1.000...).  If, after calling Emulate(), it is still != 1, Mednafen will handle it internally.
-	// Emulation modules can handle volume themselves if they like, for speed reasons.  If they do, afterwards, they should set its value to 1.
-	float SoundVolume;
-
-	// Current sound speed multiplier.  Set by the driver code.  If, after calling Emulate(), it is still != 1, Mednafen will handle it internally
-	// by resampling the audio.  This means that emulation modules can handle(and set the value to 1 after handling it) it if they want to get the most
-	// performance possible.  HOWEVER, emulation modules must make sure the value is in a range(with minimum and maximum) that their code can handle
-	// before they try to handle it.
-	float soundmultiplier;
 
 	// True if we want to rewind one frame.  Set by the driver code.
 	uint32_t NeedRewind;

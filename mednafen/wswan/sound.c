@@ -369,7 +369,7 @@ void WSwan_SoundInit(void)
 
 void WSwan_SoundKill(void)
 {
-   for(int i = 0; i < 2; i++)
+   for(unsigned i = 0; i < 2; i++)
    {
 	   Blip_Buffer_deinit(&sbuf[i]);
    }
@@ -432,35 +432,6 @@ void WSwan_SoundSaveState(uint32_t load, FILE* fp)
 		fwrite(&nreg, sizeof(uint8_t), sizeof(nreg), fp);
 	}
 }
-
-/*
-int WSwan_SoundStateAction(StateMem *sm, int load, int data_only)
-{
- SFORMAT StateRegs[] =
- {
-  SFARRAY16(period, 4),
-  SFARRAY(volume, 4),
-  SFVAR(voice_volume),
-  SFVAR(sweep_step),
-  SFVAR(sweep_value),
-  SFVAR(noise_control),
-  SFVAR(control),
-  SFVAR(output_control),
-
-  SFVAR(sweep_8192_divider),
-  SFVAR(sweep_counter),
-  SFVAR(SampleRAMPos),
-  SFARRAY32(period_counter, 4),
-  SFARRAY(sample_pos, 4),
-  SFVAR(nreg),
-  SFEND
- };
-
- if(!MDFNSS_StateAction(sm, load, data_only, StateRegs, "PSG", false))
-  return(0);
-
- return(1);
-}*/
 
 void WSwan_SoundReset(void)
 {

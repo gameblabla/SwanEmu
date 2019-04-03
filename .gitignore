@@ -7,3 +7,5 @@
 *.sts
 *.elf
 log.txt
+*.txt
+*.out

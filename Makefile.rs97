@@ -1,13 +1,15 @@
-PRGNAME     = swanemu.elf
+PRGNAME     = oswan
 CC          = /opt/rs97-toolchain/bin/mipsel-linux-gcc
 
 # change compilation / linking flag options
-F_OPTS		= -DLSB_FIRST -Imednafen -Imednafen/sound -DINLINE="inline" -DWANT_16BPP -DFRONTEND_SUPPORTS_RGB565
-F_OPTS		+= -DMEDNAFEN_VERSION_NUMERIC=931 -DOSS_SOUND
-CC_OPTS		= $(F_OPTS)
-CFLAGS		= $(CC_OPTS) 
+CFLAGS		=  -DMEDNAFEN_VERSION_NUMERIC=931 -DOSS_SOUND
+CFLAGS		+= -DLSB_FIRST -Imednafen -Imednafen/sound -DINLINE="inline" -DWANT_16BPP -DFRONTEND_SUPPORTS_RGB565 -DFRAMESKIP
+
 CFLAGS		+= -std=gnu99 
-CFLAGS		+= -Ofast -fprofile-use -fdata-sections -ffunction-sections -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -mips32 -fno-PIC -mno-abicalls -flto -fwhole-program
+CFLAGS		+= -Ofast -fdata-sections -ffunction-sections  -mno-fp-exceptions -mno-interlink-compressed -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -mips32 -fno-PIC -mno-abicalls -flto -fwhole-program
+CFLAGS		+= -falign-functions=1 -falign-jumps=1 -falign-loops=1 -falign-labels=1 -mlong32 -mno-micromips
+#CFLAGS		+= -fprofile-generate=/home/retrofw/profile
+CFLAGS		+= -frename-registers -funroll-loops 
 
 LDFLAGS     = -nodefaultlibs -lc -lgcc -lSDL -Wl,--as-needed -Wl,--gc-sections -flto -no-pie -s
 

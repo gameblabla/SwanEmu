@@ -69,7 +69,7 @@ void wsSetVideo(uint32_t number, uint32_t force)
 
 void wsMakeTiles(void)
 {
-	int	x,y,b0,b1,b2,b3,b4,b5,b6,b7;
+	uint32_t x,y,b0,b1,b2,b3,b4,b5,b6,b7;
 	for(x=0;x<256;x++)
 	{
 		for(y=0;y<256;y++)
