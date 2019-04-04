@@ -265,40 +265,39 @@ uint8_t WSwan_GfxRead(uint32_t A)
    return 0;
 }
 
-uint32_t wsExecuteLine(uint16_t* restrict pixels, uint8_t pitch, uint32_t skip)
+uint32_t wsExecuteLine(uint16_t* restrict pixels, uint8_t pitch, const uint32_t skip)
 {
 	uint32_t ret = false;
-
-	if (wsLine < 144)
+	
+	if (!skip)
 	{
-		if (!skip)
+		if (wsLine < 144)
 		{
 			wsScanline(pixels + wsLine * pitch);
 		}
+
+		WSwan_CheckSoundDMA();
+
+		// Update sprite data table
+		if (wsLine == 142)
+		{
+			SpriteCountCache = SpriteCount;
+
+			if(SpriteCountCache > 0x80)
+				SpriteCountCache = 0x80;
+
+			memcpy(SpriteTable, &wsRAM[(SPRBase << 9) + (SpriteStart << 2)], SpriteCountCache << 2);
+		}
 	}
-
-	WSwan_CheckSoundDMA();
-
-	// Update sprite data table
-	if (wsLine == 142)
-	{
-		SpriteCountCache = SpriteCount;
-
-		if(SpriteCountCache > 0x80)
-			SpriteCountCache = 0x80;
-
-		memcpy(SpriteTable, &wsRAM[(SPRBase << 9) + (SpriteStart << 2)], SpriteCountCache << 2);
-	}
-
+	
 	if (wsLine == 144)
 	{
 		ret = true;
 		WSwan_Interrupt(WSINT_VBLANK);
 	}
 
-
-   if (HBCounter && (BTimerControl & 0x01))
-   {
+	if (HBCounter && (BTimerControl & 0x01))
+	{
 		HBCounter--;
 		if (!HBCounter)
 		{
@@ -307,35 +306,34 @@ uint32_t wsExecuteLine(uint16_t* restrict pixels, uint8_t pitch, uint32_t skip)
 				HBCounter = HBTimerPeriod;
 			WSwan_Interrupt(WSINT_HBLANK_TIMER);
 		}
-   }
+	}
 
-   v30mz_execute(224);
-   wsLine = (wsLine + 1) % 159;
-   if(wsLine == LineCompare)
-   {
-      WSwan_Interrupt(WSINT_LINE_HIT);
-      //printf("Line hit: %d\n", wsLine);
-   }
-   v30mz_execute(32);
-   WSwan_RTCClock(256);
+	v30mz_execute(224);
+	wsLine = (wsLine + 1) % 159;
+	if(wsLine == LineCompare)
+	{
+		WSwan_Interrupt(WSINT_LINE_HIT);
+		//printf("Line hit: %d\n", wsLine);
+	}
+	v30mz_execute(32);
+	WSwan_RTCClock(256);
 
-   if(!wsLine)
-   {
-      if(VBCounter && (BTimerControl & 0x04))
-      {
-         VBCounter--;
-         if(!VBCounter)
-         {
-            if(BTimerControl & 0x08) // Loop mode?
-               VBCounter = VBTimerPeriod;
+	if (!wsLine)
+	{
+		if(VBCounter && (BTimerControl & 0x04))
+		{
+			VBCounter--;
+			if(!VBCounter)
+			{
+				if(BTimerControl & 0x08) // Loop mode?
+					VBCounter = VBTimerPeriod;
+				WSwan_Interrupt(WSINT_VBLANK_TIMER);
+			}
+		}
+		wsLine = 0;
+	}
 
-            WSwan_Interrupt(WSINT_VBLANK_TIMER);
-         }
-      }
-      wsLine = 0;
-   }
-
-   return(ret);
+	return(ret);
 }
 
 void WSwan_SetLayerEnableMask(uint64_t mask)

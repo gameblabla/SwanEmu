@@ -185,11 +185,15 @@ static uint32_t Timer_Read(void)
 }
 static long lastTick = 0, newTick;
 static uint32_t SkipCnt = 0, video_frames = 0, FPS = 75, FrameSkip;
-static const uint32_t TblSkip[5][5] = {
-    {0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 1},
-    {0, 0, 1, 1, 1},
-    {0, 1, 1, 1, 1},
+static const uint32_t TblSkip[8][8] = {
+    {0, 0, 0, 0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 0, 0, 0, 1},
+    {0, 0, 0, 0, 0, 0, 1, 1},
+    {0, 0, 0, 0, 0, 1, 1, 1},
+    {0, 0, 0, 0, 1, 1, 1, 1},
+    {0, 0, 0, 1, 1, 1, 1, 1},
+    {0, 0, 1, 1, 1, 1, 1, 1},
+    {0, 1, 1, 1, 1, 1, 1, 1},
 };
 #endif
 
@@ -200,7 +204,7 @@ static void Emulate(EmulateSpecStruct *espec)
 
 #ifdef FRAMESKIP
 	SkipCnt++;
-	if (SkipCnt > 4) SkipCnt = 0;
+	if (SkipCnt > 7) SkipCnt = 0;
 	while(!wsExecuteLine(screen->pixels, screen->w, TblSkip[FrameSkip][SkipCnt] ));
 #else
 	while(!wsExecuteLine(screen->pixels, screen->w, 0 ));
@@ -383,25 +387,34 @@ static void Run_Emulator(void)
 
 	spec.SoundBufSize = spec.SoundBufSizeALMS + SoundBufSize;
 
-#ifdef FRAMESKIP
-	video_frames++;
-	newTick = Timer_Read();
-	if ( (newTick-lastTick) > 1000000) 
-	{
-		FPS = video_frames;
-		video_frames = 0;
-		lastTick = newTick;
-	}
-	FrameSkip = 75 / FPS;
-	if (FrameSkip > 4) FrameSkip = 4;
-	if (FPS >= 75) FrameSkip = 0;
-#endif
-
 #ifdef OSS_SOUND
 	write(oss_audio_fd, spec.SoundBuf, spec.SoundBufSize * 4 );
 #else
 	Pa_WriteStream( apu_stream, spec.SoundBuf, spec.SoundBufSize);
 #endif
+
+#ifdef FRAMESKIP
+
+	video_frames++;
+	
+	newTick = Timer_Read();
+	if ( (newTick) - (lastTick) > 1000000) 
+	{
+		FPS = video_frames;
+		video_frames = 0;
+		lastTick = newTick;
+		if (FPS >= 75)
+		{
+			FrameSkip = 0;
+		}
+		else
+		{
+			FrameSkip = 75 / FPS;
+			if (FrameSkip > 7) FrameSkip = 7;
+		}
+	}
+#endif
+
 }
 
 void *Get_memory_data(unsigned type)
