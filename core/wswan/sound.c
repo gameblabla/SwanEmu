@@ -102,7 +102,7 @@ void WSwan_SoundUpdate(void)
    //printf("%02x %02x\n", control, noise_control);
    run_time = v30mz_timestamp - last_ts;
 
-   for(unsigned int ch = 0; ch < 4; ch++)
+   for(uint_fast8_t ch = 0; ch < 4; ch++)
    {
       // Channel is disabled?
       if(!(control & (1 << ch)))
@@ -221,9 +221,10 @@ void WSwan_SoundWrite(uint32_t A, uint8_t V)
 {
    WSwan_SoundUpdate();
 
+#ifdef NOCASE_RANGE
    if(A >= 0x80 && A <= 0x87)
    {
-      int ch = (A - 0x80) >> 1;
+      uint32_t ch = (A - 0x80) >> 1;
 
       if(A & 1)
          period[ch] = (period[ch] & 0x00FF) | ((V & 0x07) << 8);
@@ -273,10 +274,66 @@ void WSwan_SoundWrite(uint32_t A, uint8_t V)
       voice_volume = V & 0xF;
       //printf("%02x\n", V);
    }
-   else switch(A)
+   else
+#endif
+   switch(A)
    {
-      case 0x8F: SampleRAMPos = V; break;
-      case 0x95: HyperVoice = V; break; // Pick a port, any port?!
+#ifndef NOCASE_RANGE
+		case 0x80 ... 0x87:
+			uint32_t ch = (A - 0x80) >> 1;
+			if(A & 1)
+			{
+				period[ch] = (period[ch] & 0x00FF) | ((V & 0x07) << 8);
+			}
+			else
+			{
+				period[ch] = (period[ch] & 0x0700) | ((V & 0xFF) << 0);
+			}
+		break;
+		case 0x88 ... 0x8B:
+			volume[A - 0x88] = V;
+		break;
+		case 0x8C:
+			sweep_value = V;
+		break;
+		case 0x8D:
+			sweep_step = V;
+			sweep_counter = sweep_step + 1;
+			sweep_8192_divider = 8192;
+		break;
+		case 0x8E:
+			noise_control = V;
+			if(V & 0x8)
+			{
+				nreg = 1;
+			}
+		break;
+		case 0x90:
+			for(uint32_t n = 0; n < 4; n++)
+			{
+				if(!(control & (1 << n)) && (V & (1 << n)))
+				{
+					period_counter[n] = 0;
+					sample_pos[n] = 0x1F;
+				}
+			}
+			control = V;
+		break;
+		case 0x91:
+			output_control = V & 0xF;
+		break;
+		case 0x92:
+			nreg = (nreg & 0xFF00) | (V << 0);
+		break;
+		case 0x93:
+			nreg = (nreg & 0x00FF) | ((V & 0x7F) << 8);
+		break;
+		case 0x94:
+			voice_volume = V & 0xF;
+		break;
+#endif
+		case 0x8F: SampleRAMPos = V; break;
+		case 0x95: HyperVoice = V; break; // Pick a port, any port?!
                  //default: printf("%04x:%02x\n", A, V); break;
    }
    WSwan_SoundUpdate();
@@ -286,9 +343,10 @@ uint8_t WSwan_SoundRead(uint32_t A)
 {
    WSwan_SoundUpdate();
 
+#ifdef NOCASE_RANGE
    if(A >= 0x80 && A <= 0x87)
    {
-      int ch = (A - 0x80) >> 1;
+      uint32_t ch = (A - 0x80) >> 1;
 
       if(A & 1)
          return(period[ch] >> 8);
@@ -297,23 +355,35 @@ uint8_t WSwan_SoundRead(uint32_t A)
    }
    else if(A >= 0x88 && A <= 0x8B)
       return(volume[A - 0x88]);
-   else switch(A)
+   else
+#endif
+   switch(A)
    {
-      default:
-         printf("SoundRead: %04x\n", A);
-         break;
-      case 0x8C: return(sweep_value);
-      case 0x8D: return(sweep_step);
-      case 0x8E: return(noise_control);
-      case 0x8F: return(SampleRAMPos);
-      case 0x90: return(control);
-      case 0x91: return(output_control | 0x80);
-      case 0x92: return((nreg >> 0) & 0xFF);
-      case 0x93: return((nreg >> 8) & 0xFF);
-      case 0x94: return(voice_volume);
-   }
+		default:
+			//printf("SoundRead: %04x\n", A);
+		break;
+#ifndef NOCASE_RANGE
+		case 0x80 ... 0x87:
+			uint32_t ch = (A - 0x80) >> 1;
+			if(A & 1)
+				return(period[ch] >> 8);
+			else
+				return(period[ch]);
+		break;
+		case 0x88 ... 0x8B: return(volume[A - 0x88]);
+#endif
+		case 0x8C: return(sweep_value);
+		case 0x8D: return(sweep_step);
+		case 0x8E: return(noise_control);
+		case 0x8F: return(SampleRAMPos);
+		case 0x90: return(control);
+		case 0x91: return(output_control | 0x80);
+		case 0x92: return((nreg >> 0) & 0xFF);
+		case 0x93: return((nreg >> 8) & 0xFF);
+		case 0x94: return(voice_volume);
+	}
 
-   return(0);
+	return(0);
 }
 
 
@@ -325,7 +395,7 @@ int32_t WSwan_SoundFlush(int16_t *SoundBuf, const int32_t MaxSoundFrames)
 
    if(SoundBuf)
    {
-      for(int y = 0; y < 2; y++)
+      for(int16_t y = 0; y < 2; y++)
       {
 			Blip_Buffer_end_frame(&sbuf[y], v30mz_timestamp);
 			FrameCount = Blip_Buffer_read_samples(&sbuf[y], SoundBuf + y, MaxSoundFrames);
@@ -346,7 +416,7 @@ void WSwan_SoundCheckRAMWrite(uint32_t A)
 
 static void RedoVolume(void)
 {
-	float eff_volume = 1.0f / 4;
+	float eff_volume = 1.0f / 4.0f;
 
 	Blip_Synth_set_volume(&WaveSynth, eff_volume, 256);
 	Blip_Synth_set_volume(&NoiseSynth, eff_volume, 256);
@@ -355,7 +425,7 @@ static void RedoVolume(void)
 
 void WSwan_SoundInit(void)
 {
-   unsigned i;
+   uint_fast8_t i;
    for(i = 0; i < 2; i++)
    {
 		Blip_Buffer_init(&sbuf[i]);
@@ -369,7 +439,7 @@ void WSwan_SoundInit(void)
 
 void WSwan_SoundKill(void)
 {
-   for(unsigned i = 0; i < 2; i++)
+   for(uint_fast8_t i = 0; i < 2; i++)
    {
 	   Blip_Buffer_deinit(&sbuf[i]);
    }
@@ -378,7 +448,7 @@ void WSwan_SoundKill(void)
 
 uint32_t WSwan_SetSoundRate(uint32_t rate)
 {
-	unsigned i;
+	uint_fast8_t i;
 	for(i = 0; i < 2; i++)
 	{
 		Blip_Buffer_set_sample_rate(&sbuf[i], rate ? rate : 44100, 60);
@@ -435,30 +505,29 @@ void WSwan_SoundSaveState(uint32_t load, FILE* fp)
 
 void WSwan_SoundReset(void)
 {
-   unsigned y;
+	uint_fast8_t y;
+	memset(period, 0, sizeof(period));
+	memset(volume, 0, sizeof(volume));
+	voice_volume = 0;
+	sweep_step = 0;
+	sweep_value = 0;
+	noise_control = 0;
+	control = 0;
+	output_control = 0;
 
-   memset(period, 0, sizeof(period));
-   memset(volume, 0, sizeof(volume));
-   voice_volume = 0;
-   sweep_step = 0;
-   sweep_value = 0;
-   noise_control = 0;
-   control = 0;
-   output_control = 0;
+	sweep_8192_divider = 8192;
+	sweep_counter = 0;
+	SampleRAMPos = 0;
+	memset(period_counter, 0, sizeof(period_counter));
+	memset(sample_pos, 0, sizeof(sample_pos));
+	nreg = 1;
 
-   sweep_8192_divider = 8192;
-   sweep_counter = 0;
-   SampleRAMPos = 0;
-   memset(period_counter, 0, sizeof(period_counter));
-   memset(sample_pos, 0, sizeof(sample_pos));
-   nreg = 1;
+	memset(sample_cache, 0, sizeof(sample_cache));
+	memset(last_val, 0, sizeof(last_val));
+	last_v_val = 0;
 
-   memset(sample_cache, 0, sizeof(sample_cache));
-   memset(last_val, 0, sizeof(last_val));
-   last_v_val = 0;
-
-   HyperVoice = 0;
-   last_hv_val = 0;
+	HyperVoice = 0;
+	last_hv_val = 0;
 
 	for (y = 0; y < 2; y++)
 	{

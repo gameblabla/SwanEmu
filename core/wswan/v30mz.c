@@ -353,7 +353,7 @@ static void DoOP(uint8_t opcode)
    switch(opcode)
    {
       default:
-         printf("Invalid op: %02x\n", opcode);
+         //printf("Invalid op: %02x\n", opcode);
          CLK(10);
          break;
 
@@ -601,7 +601,21 @@ static void DoOP(uint8_t opcode)
          OP( 0x8a, i_mov_r8b   ) { uint8_t  src; GetModRM; src = GetRMByte(ModRM);	RegByte(ModRM)=src;	CLK(1);	} OP_EPILOGUE;
          OP( 0x8b, i_mov_r16w  ) { uint16_t src; GetModRM; src = GetRMWord(ModRM);	RegWord(ModRM)=src; 	CLK(1); } OP_EPILOGUE;
          OP( 0x8c, i_mov_wsreg ) { GetModRM; PutRMWord(ModRM,I.sregs[(ModRM & 0x38) >> 3]);		CLK(1);	} OP_EPILOGUE;
-         OP( 0x8d, i_lea       ) { uint16_t ModRM = FETCH; if(ModRM >= 192) { printf("LEA Error: %02x\n", ModRM);} else { (void)(*GetEA[ModRM])(); } RegWord(ModRM)=EO; 	CLK(1);	} OP_EPILOGUE;
+         OP( 0x8d, i_lea       ) 
+         { 
+				uint16_t ModRM = FETCH;
+				/* Not required, besides this slowdwons things - Gameblabla*/
+				/*if(ModRM >= 192)
+				{
+				 printf("LEA Error: %02x\n", ModRM);
+				} 
+				else*/
+				{ 
+					(void)(*GetEA[ModRM])(); 
+				} 
+				RegWord(ModRM)=EO;
+				CLK(1);
+		} OP_EPILOGUE;
          OP( 0x8e, i_mov_sregw ) { uint16_t src; GetModRM; src = GetRMWord(ModRM); CLKM(3,2);
             switch (ModRM & 0x38) {
                case 0x00: I.sregs[DS1] = src; break; /* mov ds1,ew */

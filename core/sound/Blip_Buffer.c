@@ -49,9 +49,9 @@ void Blip_Buffer_deinit(Blip_Buffer* bbuf)
 
 void Blip_Buffer_clear(Blip_Buffer* bbuf, int entire_buffer)
 {
-	bbuf->offset      = 0;
+	bbuf->offset = 0;
 	bbuf->reader_accum = 0;
-	bbuf->modified    = 0;
+	bbuf->modified = 0;
 	if (bbuf->buffer)
 	{
 		long count = (entire_buffer ? bbuf->buffer_size : Blip_Buffer_samples_avail(bbuf));

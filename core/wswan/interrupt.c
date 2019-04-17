@@ -12,81 +12,80 @@ static uint32_t IVector_Cache;
 
 static void RecalcInterrupt(void)
 {
-   unsigned i;
+	uint32_t i;
+	IOn_Cache = false;
+	IOn_Which = 0;
+	IVector_Cache = 0;
 
-   IOn_Cache = false;
-   IOn_Which = 0;
-   IVector_Cache = 0;
-
-   for(i = 0; i < 8; i++)
-   {
-      if(IStatus & IEnable & (1 << i))
-      {
-         IOn_Cache = true;
-         IOn_Which = i;
-         IVector_Cache = (IVectorBase + i) * 4;
-         break;
-      }
-   }
+	for(i = 0; i < 8; i++)
+	{
+		if(IStatus & IEnable & (1 << i))
+		{
+			IOn_Cache = true;
+			IOn_Which = i;
+			IVector_Cache = (IVectorBase + i) * 4;
+			break;
+		}
+	}
 }
 
 void WSwan_InterruptDebugForce(unsigned int level)
 {
-   v30mz_int((IVectorBase + level) * 4, true);
+	v30mz_int((IVectorBase + level) * 4, true);
 }
 
 void WSwan_Interrupt(int which)
 {
-   if(IEnable & (1 << which))
-      IStatus |= 1 << which;
+	if(IEnable & (1 << which))
+		IStatus |= 1 << which;
 
-   RecalcInterrupt();
+	RecalcInterrupt();
 }
 
 void WSwan_InterruptWrite(uint32_t A, uint8_t V)
 {
-   switch(A)
-   {
-      case 0xB0:
-         IVectorBase = V; RecalcInterrupt();
-         break;
-      case 0xB2:
-         IEnable = V; IStatus &= IEnable; RecalcInterrupt();
-         break;
-      case 0xB6:
-         IStatus &= ~V;
-         RecalcInterrupt();
-         break;
-   }
+	switch(A)
+	{
+		case 0xB0:
+			IVectorBase = V; RecalcInterrupt();
+		break;
+		case 0xB2:
+			IEnable = V; IStatus &= IEnable; RecalcInterrupt();
+		break;
+		case 0xB6:
+			IStatus &= ~V;
+			RecalcInterrupt();
+		break;
+	}
 }
 
 uint8_t WSwan_InterruptRead(uint32_t A)
 {
-   switch(A)
-   {
-      case 0xB0:
-         return(IVectorBase);
-      case 0xB2:
-         return(IEnable);
-      case 0xB6:
-         return(1 << IOn_Which); //return(IStatus);
-   }
+	switch(A)
+	{
+		case 0xB0:
+			return(IVectorBase);
+		case 0xB2:
+			return(IEnable);
+		case 0xB6:
+			return(1 << IOn_Which); //return(IStatus);
+	}
 
-   return 0;
+	return 0;
 }
 
 void WSwan_InterruptCheck(void)
 {
-   if(IOn_Cache)
-      v30mz_int(IVector_Cache, false);
+	if(IOn_Cache)
+		v30mz_int(IVector_Cache, false);
 }
 
 void WSwan_InterruptReset(void)
 {
-   IEnable = 0x00;
-   IStatus = 0x00;
-   IVectorBase = 0x00;
-   RecalcInterrupt();
+	IEnable = 0x00;
+	IStatus = 0x00;
+	IVectorBase = 0x00;
+	RecalcInterrupt();
 }
 
 void WSwan_InterruptSaveState(uint32_t load, FILE* fp)
