@@ -1,432 +1,633 @@
-#include <SDL/SDL.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <libgen.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <time.h>
+#include <SDL/SDL.h>
 
+#include "scaler.h"
 #include "font_drawing.h"
-#include "browser.h"
-#include "drawing.h"
-#include "shared.h"
+#include "sound_output.h"
+#include "video_blit.h"
+#include "config.h"
 #include "menu.h"
 
-static uint32_t done_menu = 0;
-uint32_t profile_config = 0;
+t_config option;
+uint32_t emulator_state = 0;
 
-struct hardcoded_keys keys_config[9];
-struct Menu__ menu_oswan;
+static char home_path[256], save_path[256], eeprom_path[256], conf_path[256];
+static uint32_t controls_chosen = 0;
 
-const char Main_Menu_Text[8][MAX_TEXT_SIZE] =
+extern SDL_Surface *sdl_screen;
+extern char GameName_emu[512];
+
+extern void EEPROM_file(char* path, uint_fast8_t state);
+extern void SaveState(char* path, uint_fast8_t state);
+
+static uint8_t selectpressed = 0;
+static uint8_t save_slot = 0;
+static const int8_t upscalers_available = 2
+#ifdef SCALE2X_UPSCALER
++1
+#endif
+;
+
+static void SaveState_Menu(uint_fast8_t load_mode, uint_fast8_t slot)
 {
-	"Load ROM",
-	"Continue",
-	"Load State :",
-	"Save State :",
-	"Scaling :",
-	"Input Options",
-	"Exit"
-}; 
+	char tmp[512];
+	snprintf(tmp, sizeof(tmp), "%s/%s_%d.sts", save_path, GameName_emu, slot);
+	SaveState(tmp,load_mode);
+}
 
-const char Scaling_Text[3][MAX_TEXT_SIZE] =
+static void EEPROM_Menu(uint_fast8_t load_mode)
 {
-	"Native",
-	"Fullscreen",
-	"Keep Aspect"
-}; 
+	char tmp[512];
+	snprintf(tmp, sizeof(tmp), "%s/%s.eps", eeprom_path, GameName_emu);
+	EEPROM_file(tmp,load_mode);
+}
 
-const char Controls_Text[12][MAX_TEXT_SIZE] =
+static void config_load()
 {
-	"Y1",    "Y2",
-	"Y3",    "Y4",
-	"X1",    "X2",
-	"X3",    "X4",
-	"OPTION", "START",
-	"A", 	   "B"
-}; 
-
-const char Controls_Text_Nocenter[12][MAX_TEXT_SIZE] =
-{
-	{"Y1 (UP)   "},
-	{"Y2 (RIGHT)"},
-	{"Y3 (DOWN) "},
-	{"Y4 (LEFT) "},
-	{"X1 (UP)   "},
-	{"X2 (RIGHT)"},
-	{"X3 (DOWN) "},
-	{"X4 (LEFT) "},
-	{"OPTION    "},
-	{"START     "},
-	{"A         "},
-	{"B         "}
-}; 
-
-/* Configuration files */
-
-void load_config(void)
-{
-	uint32_t i, a;
-	char home_path[PATH_MAX], cfg_path[PATH_MAX];
+	uint_fast8_t i;
+	char config_path[512];
 	FILE* fp;
-	
-	snprintf(home_path, sizeof(home_path), "%s/.oswan", getenv("HOME"));
-	snprintf(cfg_path, sizeof(cfg_path), "%s/config.bin", home_path);
-	
-	mkdir(home_path, 0655);
-	
-	fp = fopen(cfg_path, "rb");
+	snprintf(config_path, sizeof(config_path), "%s/%s.cfg", conf_path, GameName_emu);
+
+	fp = fopen(config_path, "rb");
 	if (fp)
 	{
-		fread(&menu_oswan, sizeof(uint8_t), sizeof(menu_oswan), fp);
-		fread(&keys_config, sizeof(uint8_t), (14*4)*sizeof(uint32_t), fp);
+		fread(&option, sizeof(option), sizeof(int8_t), fp);
 		fclose(fp);
 	}
 	else
 	{
-		/* Set default settings */
-		for (i=1;i<9;i++)
-		{
-			for (a=0;a<14;a++)
-			{
-				keys_config[i].buttons[a] = 0;
-			}
-		}
+		/* Default mapping for Horizontal */
+		option.config_buttons[0][0] = 273;
+		option.config_buttons[0][1] = 275;
+		option.config_buttons[0][2] = 274;
+		option.config_buttons[0][3] = 276;
 		
-		/* Default profile */
-		keys_config[0].buttons[0] = 273;
-		keys_config[0].buttons[1] = 275;
-		keys_config[0].buttons[2] = 274;
-		keys_config[0].buttons[3] = 276;
-		keys_config[0].buttons[4] = 273;
-		keys_config[0].buttons[5] = 275;
-		keys_config[0].buttons[6] = 274;
-		keys_config[0].buttons[7] = 276;
-		keys_config[0].buttons[8] = 8;
-		keys_config[0].buttons[9] = 13;
-		keys_config[0].buttons[10] = 306;
-		keys_config[0].buttons[11] = 308;
+		option.config_buttons[0][4] = 0;
+		option.config_buttons[0][5] = 0;
+		option.config_buttons[0][6] = 0;
+		option.config_buttons[0][7] = 0;
+		
+		option.config_buttons[0][8] = 1;
+		option.config_buttons[0][9] = 13;
+				
+		option.config_buttons[0][10] = 306;
+		option.config_buttons[0][11] = 308;
+		
+		/* Default mapping for Vertical mode */
+		option.config_buttons[1][0] = 306;
+		option.config_buttons[1][1] = 308;
+		option.config_buttons[1][2] = 304;
+		option.config_buttons[1][3] = 32;
+		
+		option.config_buttons[1][4] = 276;
+		option.config_buttons[1][5] = 273;
+		option.config_buttons[1][6] = 275;
+		option.config_buttons[1][7] = 274;
+		
+		option.config_buttons[1][8] = 1;
+		option.config_buttons[1][9] = 13;
+				
+		option.config_buttons[1][10] = 0;
+		option.config_buttons[1][11] = 0;
 	}
 }
 
-
-void save_config(void)
+static void config_save()
 {
-	char home_path[PATH_MAX], cfg_path[PATH_MAX];
 	FILE* fp;
+	char config_path[512];
+	snprintf(config_path, sizeof(config_path), "%s/%s.cfg", conf_path, GameName_emu);
 	
-	snprintf(home_path, sizeof(home_path), "%s/.oswan", getenv("HOME"));
-	snprintf(cfg_path, sizeof(cfg_path), "%s/config.bin", home_path);
-	
-	mkdir(home_path, 0655);
-	fp = fopen(cfg_path, "wb");
+	fp = fopen(config_path, "wb");
 	if (fp)
 	{
-		fwrite(&menu_oswan, sizeof(uint8_t), sizeof(menu_oswan), fp);
-		fwrite(&keys_config, sizeof(uint8_t), (14*9)*sizeof(uint32_t), fp);
+		fwrite(&option, sizeof(option), sizeof(int8_t), fp);
 		fclose(fp);
 	}
 }
 
-/* Save states */
-
-/* Save current state of game emulated	*/
-void Save_State(void) 
+static const char* Return_Text_Button(uint32_t button)
 {
-    char szFile[PATH_MAX];
-	
-	if (cartridge_IsLoaded()) 
+	switch(button)
 	{
-		m_Flag = GF_GAMERUNNING;
-		strcpy(szFile, gameName);
-		WsSaveState(szFile, menu_oswan.menu_state);
-		done_menu = 1;
-	}
-}
-
-/* Load current state of game emulated	*/
-void Load_State(void) 
-{
-    char szFile[PATH_MAX];
-	
-	if (cartridge_IsLoaded()) 
-	{
-		m_Flag = GF_GAMERUNNING;
-		strcpy(szFile, gameName);
-		WsLoadState(szFile, menu_oswan.menu_state);
-		done_menu = 1;
-	}
-}
-
-/* Menu code */
-
-static void Set_Menu(uint32_t submenu)
-{
-	Clear_Screen_Norefresh();
-	if (submenu == CONTROLS_MENU)
-	{
-		menu_oswan.Choose_Menu_value = 0;
-		menu_oswan.maximum_menu = 12;
-		menu_oswan.state_number = 0;
-		if (!menu_oswan.scaling) menu_oswan.scaling = 0;
-		menu_oswan.menu_state = 1;
-		Draw_Rect_Menu(Y_MENU_CONTROLS, 15);
-	}
-	else if (submenu == EMULATOR_MAIN_MENU)
-	{
-		menu_oswan.Choose_Menu_value = 0;
-		menu_oswan.maximum_menu = 7;
-		menu_oswan.state_number = 0;
-		if (!menu_oswan.scaling) menu_oswan.scaling = 0;
-		menu_oswan.menu_state = 0;
-		Draw_Rect_Menu(Y_MAIN_MENU, 16);
-	}
-	else if (submenu == SETTINGS_KEY_SCREEN)
-	{
-		menu_oswan.menu_state = 2;
-	}
-	/* Useful for going back to Controls menu without resetting everything back to zero */
-	else if (submenu == CONTROLS_MENU_NOSET)
-	{
-		menu_oswan.menu_state = 1;
-	}
-}
-
-void AddItem(const char* text, uint32_t entry)
-{
-	uint32_t y = 48 + (entry * 24);
-	uint32_t x = 16;
-	
-	print_string(text, TextWhite, 0, x, y, Surface_to_Draw);
-}
-
-void AddItem_Alt(const char* text, uint32_t entry)
-{
-	uint32_t y = 48 + (entry * 16);
-	uint32_t x = 16;
-	
-	print_string(text, TextWhite, 0, x, y, Surface_to_Draw);
-}
-
-void print_text_center(const char* text, uint32_t y)
-{
-	uint32_t sizeofarray = strnlen(text, MAX_TEXT_SIZE);
-	uint32_t x = (screen_scale.w_display - (sizeofarray * 8)) / 2;
-	
-	print_string(text, TextWhite, 0, x, y, Surface_to_Draw);
-}
-
-static uint32_t sdl_controls_update_input(SDLKey k, int32_t p)
-{
-	switch(menu_oswan.menu_state)
-	{
-		case 0:
-		switch(k)
-		{
-			case SDLK_UP:
-				if (menu_oswan.Choose_Menu_value == 0) menu_oswan.Choose_Menu_value = menu_oswan.maximum_menu-1;
-				else menu_oswan.Choose_Menu_value--;
-				Clear_Screen_Norefresh();
-				Draw_Rect_Menu(Y_MAIN_MENU, 16);
-			break;
-			case SDLK_DOWN:
-				menu_oswan.Choose_Menu_value++;
-				if (menu_oswan.Choose_Menu_value > menu_oswan.maximum_menu-1) menu_oswan.Choose_Menu_value = 0;
-				Clear_Screen_Norefresh();
-				Draw_Rect_Menu(Y_MAIN_MENU, 16);
-			break;
-			case SDLK_LEFT:
-				if (menu_oswan.Choose_Menu_value == 2 || menu_oswan.Choose_Menu_value == 3)
-				{
-					if (menu_oswan.state_number == 0) menu_oswan.state_number = 9;
-					else menu_oswan.state_number--;
-				}
-				else if (menu_oswan.Choose_Menu_value == 4)
-				{
-					if (menu_oswan.scaling == 0) menu_oswan.scaling = 2;
-					else menu_oswan.scaling--;
-				}
-				Clear_Screen_Norefresh();
-				Draw_Rect_Menu(Y_MAIN_MENU, 16);
-			break;
-			case SDLK_RIGHT:
-				if (menu_oswan.Choose_Menu_value == 2 || menu_oswan.Choose_Menu_value == 3)
-				{
-					menu_oswan.state_number++;
-					if (menu_oswan.state_number > 9) menu_oswan.state_number = 0;
-				}
-				else if (menu_oswan.Choose_Menu_value == 4)
-				{
-					menu_oswan.scaling++;
-					if (menu_oswan.scaling > 2) menu_oswan.scaling = 0;
-				}
-				Clear_Screen_Norefresh();
-				Draw_Rect_Menu(Y_MAIN_MENU, 16);
-			break;
-			case SDLK_LCTRL:
-			case SDLK_RETURN:
-				if (menu_oswan.Choose_Menu_value == 5) Set_Menu(CONTROLS_MENU);
-				else if (menu_oswan.Choose_Menu_value == 6)
-				{
-					done_menu = 1;
-					m_Flag = GF_GAMEQUIT;
-				}
-				else if (menu_oswan.Choose_Menu_value == 0)
-				{
-					uint32_t Rom_Selected = FileBrowser();
-					/* If Path is not NULL then execute the file right away */
-					if (Rom_Selected)
-					{
-						done_menu = 1;
-						/* Save EEPROM for current game before moving on to the next game to load.
-						 * game_alreadyloaded is to make sure that we loaded a ROM before to avoid
-						 * a Segmentation fault due to undefined gameName. */
-						if (game_alreadyloaded == 1) WsSaveEeprom();
-						snprintf(gameName, sizeof(gameName) ,"%s", file_to_start);
-						m_Flag = GF_GAMEINIT;
-					}
-					else
-					{
-						Clear_Screen_Norefresh();
-						Draw_Rect_Menu(Y_MENU_CONTROLS, 15);	
-					}
-				}
-				else if (menu_oswan.Choose_Menu_value == 1)
-				{
-					done_menu = 1;
-					m_Flag = GF_GAMERUNNING;
-				}
-				else if (menu_oswan.Choose_Menu_value == 2)
-				{
-					Load_State();
-				}
-				else if (menu_oswan.Choose_Menu_value == 3)
-				{
-					Save_State();
-				}
-			break;
-		}
+		/* UP button */
+		case 273:
+			return "DPAD UP";
 		break;
+		/* DOWN button */
+		case 274:
+			return "DPAD DOWN";
+		break;
+		/* LEFT button */
+		case 276:
+			return "DPAD LEFT";
+		break;
+		/* RIGHT button */
+		case 275:
+			return "DPAD RIGHT";
+		break;
+		/* A button */
+		case 306:
+			return "A button";
+		break;
+		/* B button */
+		case 308:
+			return "B button";
+		break;
+		/* X button */
+		case 304:
+			return "TA button";
+		break;
+		/* Y button */
+		case 32:
+			return "TB button";
+		break;
+		/* L button */
+		case 9:
+			return "L button";
+		break;
+		/* R button */
+		case 8:
+			return "R button";
+		break;
+		/* Power button */
+		case 279:
+			return "POWER";
+		break;
+		/* Brightness */
+		case 34:
+			return "Brightness";
+		break;
+		/* Volume - */
+		case 38:
+			return "Volume -";
+		break;
+		/* Volume + */
+		case 233:
+			return "Volume +";
+		break;
+		/* Start */
+		case 13:
+			return "Start button";
+		break;
+		/* Select */
 		case 1:
-		switch(k)
-		{	
-			case SDLK_UP:
-				if (menu_oswan.Choose_Menu_value == 0) menu_oswan.Choose_Menu_value = menu_oswan.maximum_menu-1;
-				else menu_oswan.Choose_Menu_value--;
-				Clear_Screen_Norefresh();
-				Draw_Rect_Menu(Y_MENU_CONTROLS, 15);
-			break;
-			case SDLK_DOWN:
-				menu_oswan.Choose_Menu_value++;
-				if (menu_oswan.Choose_Menu_value > menu_oswan.maximum_menu-1) menu_oswan.Choose_Menu_value = 0;
-				Clear_Screen_Norefresh();
-				Draw_Rect_Menu(Y_MENU_CONTROLS, 15);
-			break;
-			case SDLK_TAB:
-			case SDLK_LEFT:
-				if (profile_config > 0) profile_config--;
-				Clear_Screen_Norefresh();
-				Draw_Rect_Menu(Y_MENU_CONTROLS, 15);
-			break;
-			case SDLK_BACKSPACE:
-			case SDLK_RIGHT:
-				if (profile_config < 8) profile_config++;
-				Clear_Screen_Norefresh();
-				Draw_Rect_Menu(Y_MENU_CONTROLS, 15);
-			break;
-			case SDLK_LCTRL:
-			case SDLK_RETURN:
-				Set_Menu(SETTINGS_KEY_SCREEN);
-			break;
-			case SDLK_LALT:
-				Set_Menu(EMULATOR_MAIN_MENU);
-			break;
-		}
+			return "Select button";
 		break;
-		case 2:
-			keys_config[profile_config].buttons[menu_oswan.Choose_Menu_value] = k;
-			Set_Menu(CONTROLS_MENU_NOSET);
+		default:
+			return "...";
 		break;
-	}
-	return 0;
+	}	
 }
 
-static void Controls_Menu()
+static void Input_Remapping()
 {
-	SDL_Event event;
-	while (SDL_PollEvent(&event))
+	SDL_Event Event;
+	char text[50];
+	uint32_t pressed = 0;
+	int32_t currentselection = 1;
+	int32_t exit_input = 0;
+	uint32_t exit_map = 0;
+	
+	while(!exit_input)
 	{
-		switch (event.type)
-		{
-			case SDL_KEYDOWN:
-				sdl_controls_update_input(event.key.keysym.sym, 0);
-			break;
-		}
-	}
-}
+		pressed = 0;
+		SDL_FillRect( backbuffer, NULL, 0 );
+		
+        while (SDL_PollEvent(&Event))
+        {
+            if (Event.type == SDL_KEYDOWN)
+            {
+                switch(Event.key.keysym.sym)
+                {
+                    case SDLK_UP:
+                        currentselection--;
+                        if (currentselection < 1)
+                        {
+							if (currentselection > 9) currentselection = 12;
+							else currentselection = 9;
+						}
+                        break;
+                    case SDLK_DOWN:
+                        currentselection++;
+                        if (currentselection == 10)
+                        {
+							currentselection = 1;
+						}
+                        break;
+                    case SDLK_LCTRL:
+                    case SDLK_RETURN:
+                        pressed = 1;
+					break;
+                    case SDLK_ESCAPE:
+                        option.config_buttons[controls_chosen][currentselection - 1] = 0;
+					break;
+                    case SDLK_LALT:
+                        exit_input = 1;
+					break;
+                    case SDLK_LEFT:
+						if (currentselection > 9) currentselection -= 9;
+					break;
+                    case SDLK_RIGHT:
+						if (currentselection < 10) currentselection += 9;
+					break;
+                    case SDLK_BACKSPACE:
+						controls_chosen = 1;
+					break;
+                    case SDLK_TAB:
+						controls_chosen = 0;
+					break;
+					default:
+					break;
+                }
+            }
+        }
 
-/* Main Menu */
+        if (pressed)
+        {
+            switch(currentselection)
+            {
+                default:
+					SDL_FillRect( backbuffer, NULL, 0 );
+					print_string("Please press button for mapping", TextWhite, TextBlue, 37, 108, backbuffer->pixels);
+					bitmap_scale(0,0,320,240,sdl_screen->w,sdl_screen->h,320,0,(uint16_t* restrict)backbuffer->pixels,(uint16_t* restrict)sdl_screen->pixels);
+					SDL_Flip(sdl_screen);
+					exit_map = 0;
+					while( !exit_map )
+					{
+						while (SDL_PollEvent(&Event))
+						{
+							if (Event.type == SDL_KEYDOWN)
+							{
+								if (Event.key.keysym.sym != SDLK_RCTRL)
+								{
+									option.config_buttons[controls_chosen][currentselection - 1] = Event.key.keysym.sym;
+									exit_map = 1;
+								}
+							}
+						}
+					}
+				break;
+            }
+        }
+        
+        if (currentselection > 12) currentselection = 12;
+
+		if (controls_chosen == 0) print_string("Horizontal mode", TextWhite, 0, 100, 10, backbuffer->pixels);
+		else print_string("Vertical mode", TextWhite, 0, 100, 10, backbuffer->pixels);
+		
+		print_string("Press [A] to map to a button", TextWhite, TextBlue, 50, 210, backbuffer->pixels);
+		print_string("Press [B] to Exit", TextWhite, TextBlue, 85, 225, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "Y1   : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][0]));
+		if (currentselection == 1) print_string(text, TextRed, 0, 5, 25+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 25+2, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "Y2   : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][1]));
+		if (currentselection == 2) print_string(text, TextRed, 0, 5, 45+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 45+2, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "Y3   : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][2]));
+		if (currentselection == 3) print_string(text, TextRed, 0, 5, 65+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 65+2, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "Y4   : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][3]));
+		if (currentselection == 4) print_string(text, TextRed, 0, 5, 85+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 85+2, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "X1   : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][4]));
+		if (currentselection == 5) print_string(text, TextRed, 0, 5, 105+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 105+2, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "X2   : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][5]));
+		if (currentselection == 6) print_string(text, TextRed, 0, 5, 125+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 125+2, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "X3   : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][6]));
+		if (currentselection == 7) print_string(text, TextRed, 0, 5, 145+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 145+2, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "X4   : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][7]));
+		if (currentselection == 8) print_string(text, TextRed, 0, 5, 165+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 165+2, backbuffer->pixels);
+			
+		snprintf(text, sizeof(text), "OPTN : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][8]));
+		if (currentselection == 9) print_string(text, TextRed, 0, 5, 185+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 185+2, backbuffer->pixels);
+			
+		snprintf(text, sizeof(text), "START: %s\n", Return_Text_Button(option.config_buttons[controls_chosen][9]));
+		if (currentselection == 10) print_string(text, TextRed, 0, 165, 25+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 165, 25+2, backbuffer->pixels);
+			
+		snprintf(text, sizeof(text), "A    : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][10]));
+		if (currentselection == 11) print_string(text, TextRed, 0, 165, 45+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 165, 45+2, backbuffer->pixels);
+			
+		snprintf(text, sizeof(text), "B    : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][11]));
+		if (currentselection == 12) print_string(text, TextRed, 0, 165, 65+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 165, 65+2, backbuffer->pixels);
+		
+		bitmap_scale(0,0,320,240,sdl_screen->w,sdl_screen->h,320,0,(uint16_t* restrict)backbuffer->pixels,(uint16_t* restrict)sdl_screen->pixels);
+		SDL_Flip(sdl_screen);
+	}
+	
+	config_save();
+}
 
 void Menu()
 {
-	char text[MAX_TEXT_SIZE];
-	uint32_t i;
-	
-	Set_Menu(0);
-	
-	done_menu = 0;
-	
-	while(!done_menu)
-	{
-		Controls_Menu();
+	char text[50];
+    int16_t pressed = 0;
+    int16_t currentselection = 1;
+    uint16_t miniscreenwidth = 112;
+    uint16_t miniscreenheight = 72;
+    SDL_Rect dstRect;
+    SDL_Event Event;
+    
+    Set_Video_Menu();
+    
+    SDL_Surface* miniscreen = SDL_CreateRGBSurface(SDL_SWSURFACE, miniscreenwidth, miniscreenheight, 16, sdl_screen->format->Rmask, sdl_screen->format->Gmask, sdl_screen->format->Bmask, sdl_screen->format->Amask);
 
-		switch(menu_oswan.menu_state)
+    SDL_LockSurface(miniscreen);
+	bitmap_scale(0,0,224,144,miniscreenwidth,miniscreenheight,224,0,(uint16_t* restrict)wswan_vs->pixels,(uint16_t* restrict)miniscreen->pixels);
+        
+    SDL_UnlockSurface(miniscreen);
+    
+	/* Save eeprom settings each time we bring up the menu */
+	EEPROM_Menu(0);
+    
+    while (((currentselection != 1) && (currentselection != 7)) || (!pressed))
+    {
+        pressed = 0;
+ 		SDL_FillRect( backbuffer, NULL, 0 );
+		
+        dstRect.x = HOST_WIDTH_RESOLUTION-10-miniscreenwidth;
+        dstRect.y = 56;
+        SDL_BlitSurface(miniscreen,NULL,backbuffer,&dstRect);
+
+		print_string("SwanEmu - Built on " __DATE__, TextWhite, 0, 5, 15, backbuffer->pixels);
+		
+		if (currentselection == 1) print_string("Continue", TextRed, 0, 5, 45, backbuffer->pixels);
+		else  print_string("Continue", TextWhite, 0, 5, 45, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "Load State %d", save_slot);
+		
+		if (currentselection == 2) print_string(text, TextRed, 0, 5, 65, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 65, backbuffer->pixels);
+		
+		snprintf(text, sizeof(text), "Save State %d", save_slot);
+		
+		if (currentselection == 3) print_string(text, TextRed, 0, 5, 85, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 85, backbuffer->pixels);
+		
+        if (currentselection == 4)
+        {
+			switch(option.fullscreen)
+			{
+				case 0:
+					print_string("Scaling : Native", TextRed, 0, 5, 105, backbuffer->pixels);
+				break;
+				case 1:
+					print_string("Scaling : Stretched", TextRed, 0, 5, 105, backbuffer->pixels);
+				break;
+				case 2:
+					print_string("Scaling : Keep scaled", TextRed, 0, 5, 105, backbuffer->pixels);
+				break;
+				case 3:
+					print_string("Scaling : EPX/Scale2x", TextRed, 0, 5, 105, backbuffer->pixels);
+				break;
+			}
+        }
+        else
+        {
+			switch(option.fullscreen)
+			{
+				case 0:
+					print_string("Scaling : Native", TextWhite, 0, 5, 105, backbuffer->pixels);
+				break;
+				case 1:
+					print_string("Scaling : Stretched", TextWhite, 0, 5, 105, backbuffer->pixels);
+				break;
+				case 2:
+					print_string("Scaling : Keep scaled", TextWhite, 0, 5, 105, backbuffer->pixels);
+				break;
+				case 3:
+					print_string("Scaling : EPX/Scale2x", TextWhite, 0, 5, 105, backbuffer->pixels);
+				break;
+			}
+        }
+
+		
+		switch(option.orientation_settings)
 		{
 			case 0:
-			print_text_center("Gameblabla's Oswan", 16);
-			if (game_alreadyloaded == 1)
-			{
-				print_string("Game loaded :", TextWhite, 0, 0, 214, Surface_to_Draw);
-				print_string(strrchr(gameName, '/')+1, TextWhite, 0, 0, 224, Surface_to_Draw);
-			}
-			
-			for (i=0;i<menu_oswan.maximum_menu;i++)
-			{
-				/* Load/Save States */
-				if (i == 2 || i == 3)
-				{
-					snprintf(text, sizeof(text), "%s %u", Main_Menu_Text[i], menu_oswan.state_number);
-					AddItem(text, i);
-				}
-				/* Scaling */
-				else if (i == 4)
-				{
-					snprintf(text, sizeof(text), "%s %s", Main_Menu_Text[i], Scaling_Text[menu_oswan.scaling]);
-					AddItem(text, i);
-				}
-				else
-				{
-					AddItem(Main_Menu_Text[i], i);
-				}
-			}
+				snprintf(text, sizeof(text), "Orientation : Auto");
 			break;
 			case 1:
-				print_text_center("Input Mapping", 8);
-				snprintf(text, sizeof(text), "Profile %u", profile_config+1);
-				print_text_center(text, 26);
-				
-				for (i=0;i<menu_oswan.maximum_menu;i++)
-				{
-					snprintf(text, sizeof(text), "%s : %u", Controls_Text_Nocenter[i], keys_config[profile_config].buttons[i]);
-					AddItem_Alt(text, i);
-				}
+				snprintf(text, sizeof(text), "Orientation : Vertical");
 			break;
 			case 2:
-				snprintf(text, sizeof(text), "Press a key for %s", Controls_Text[menu_oswan.Choose_Menu_value]);
-				print_text_center(text, 128);
+				snprintf(text, sizeof(text), "Orientation : No rotate");
 			break;
 		}
+			
+		if (currentselection == 5) print_string(text, TextRed, 0, 5, 125, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 125, backbuffer->pixels);
+		
+		if (currentselection == 6) print_string("Input remapping", TextRed, 0, 5, 145, backbuffer->pixels);
+		else print_string("Input remapping", TextWhite, 0, 5, 145, backbuffer->pixels);
+		
+		if (currentselection == 7) print_string("Quit", TextRed, 0, 5, 165, backbuffer->pixels);
+		else print_string("Quit", TextWhite, 0, 5, 165, backbuffer->pixels);
 
-		Update_Screen();
+		print_string("Mednafen Fork by gameblabla", TextWhite, 0, 5, 205, backbuffer->pixels);
+		print_string("Credits: Ryphecha, libretro", TextWhite, 0, 5, 225, backbuffer->pixels);
+
+        while (SDL_PollEvent(&Event))
+        {
+            if (Event.type == SDL_KEYDOWN)
+            {
+                switch(Event.key.keysym.sym)
+                {
+                    case SDLK_UP:
+                        currentselection--;
+                        if (currentselection == 0)
+                            currentselection = 7;
+                        break;
+                    case SDLK_DOWN:
+                        currentselection++;
+                        if (currentselection == 8)
+                            currentselection = 1;
+                        break;
+                    case SDLK_LALT:
+						pressed = 1;
+						currentselection = 1;
+						break;
+                    case SDLK_LCTRL:
+                    case SDLK_RETURN:
+                        pressed = 1;
+                        break;
+                    case SDLK_LEFT:
+                        switch(currentselection)
+                        {
+                            case 2:
+                            case 3:
+                                if (save_slot > 0) save_slot--;
+							break;
+                            case 4:
+							option.fullscreen--;
+							if (option.fullscreen < 0)
+								option.fullscreen = upscalers_available;
+							break;
+							case 5:
+								option.orientation_settings--;
+								if (option.orientation_settings < 0)
+									option.orientation_settings = 2;
+							break;
+                        }
+                        break;
+                    case SDLK_RIGHT:
+                        switch(currentselection)
+                        {
+                            case 2:
+                            case 3:
+                                save_slot++;
+								if (save_slot == 10)
+									save_slot = 9;
+							break;
+                            case 4:
+                                option.fullscreen++;
+                                if (option.fullscreen > upscalers_available)
+                                    option.fullscreen = 0;
+							break;
+							case 5:
+								option.orientation_settings++;
+								if (option.orientation_settings > 2)
+									option.orientation_settings = 0;
+							break;
+                        }
+                        break;
+					default:
+					break;
+                }
+            }
+            else if (Event.type == SDL_QUIT)
+            {
+				currentselection = 7;
+				pressed = 1;
+			}
+        }
+
+        if (pressed)
+        {
+            switch(currentselection)
+            {
+				case 6:
+					Input_Remapping();
+				break;
+				case 5:
+					option.orientation_settings++;
+					if (option.orientation_settings > 2)
+						option.orientation_settings = 0;
+				break;
+                case 4 :
+                    option.fullscreen++;
+                    if (option.fullscreen > upscalers_available)
+                        option.fullscreen = 0;
+                    break;
+                case 2 :
+                    SaveState_Menu(1, save_slot);
+					currentselection = 1;
+                    break;
+                case 3 :
+					SaveState_Menu(0, save_slot);
+					currentselection = 1;
+				break;
+				default:
+				break;
+            }
+        }
+
+		SDL_BlitSurface(backbuffer, NULL, sdl_screen, NULL);
+		SDL_Flip(sdl_screen);
+    }
+    
+    SDL_FillRect(sdl_screen, NULL, 0);
+    SDL_Flip(sdl_screen);
+    #ifdef SDL_TRIPLEBUF
+    SDL_FillRect(sdl_screen, NULL, 0);
+    SDL_Flip(sdl_screen);
+    #endif
+    
+    if (miniscreen) SDL_FreeSurface(miniscreen);
+    
+    if (currentselection == 7)
+    {
+        done = 1;
 	}
 	
-	/* Clear the screen before going back to Game or exiting the emulator */
-	Clear_Screen();
+	/* Switch back to emulator core */
+	emulator_state = 0;
+	Set_Video_InGame();
+}
+
+static void Cleanup(void)
+{
+#ifdef SCALE2X_UPSCALER
+	if (scale2x_buf) SDL_FreeSurface(scale2x_buf);
+#endif
+	if (sdl_screen) SDL_FreeSurface(sdl_screen);
+	if (backbuffer) SDL_FreeSurface(backbuffer);
+	if (wswan_vs) SDL_FreeSurface(wswan_vs);
+
+	// Deinitialize audio and video output
+	Audio_Close();
+	
+	SDL_Quit();
+}
+
+void Init_Configuration()
+{
+	snprintf(home_path, sizeof(home_path), "%s/.swanemu", getenv("HOME"));
+	
+	snprintf(conf_path, sizeof(conf_path), "%s/conf", home_path);
+	snprintf(save_path, sizeof(save_path), "%s/sstates", home_path);
+	snprintf(eeprom_path, sizeof(eeprom_path), "%s/eeprom", home_path);
+	
+	/* We check first if folder does not exist. 
+	 * Let's only try to create it if so in order to decrease boot times.
+	 * */
+	
+	if (access( home_path, F_OK ) == -1)
+	{ 
+		mkdir(home_path, 0755);
+	}
+	
+	if (access( save_path, F_OK ) == -1)
+	{
+		mkdir(save_path, 0755);
+	}
+	
+	if (access( conf_path, F_OK ) == -1)
+	{
+		mkdir(conf_path, 0755);
+	}
+	
+	if (access( eeprom_path, F_OK ) == -1)
+	{
+		mkdir(eeprom_path, 0755);
+	}
+	
+	/* Load eeprom file if it exists */
+	EEPROM_Menu(1);
+	
+	config_load();
 }

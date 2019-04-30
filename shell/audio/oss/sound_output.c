@@ -1,4 +1,5 @@
 #include <sys/ioctl.h>
+#include <stdint.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/soundcard.h>
@@ -11,7 +12,7 @@ uint32_t Audio_Init()
 {
 	uint32_t channels = 2;
 	uint32_t format = AFMT_S16_LE;
-	uint32_t tmp = 44100;
+	uint32_t tmp = SOUND_OUTPUT_FREQUENCY;
 	int32_t err_ret;
 
 	oss_audio_fd = open("/dev/dsp", O_WRONLY);

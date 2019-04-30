@@ -21,9 +21,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
-#include <SDL/SDL.h>
+#include <libgen.h>
 #include <sys/time.h>
 #include <sys/types.h>
+
+#include <SDL/SDL.h>
+
 #include "mednafen.h"
 #include "mempatcher.h"
 #include "wswan/gfx.h"
@@ -36,45 +39,21 @@
 #include "wswan/gfx.h"
 #include "wswan/eeprom.h"
 
-#include "sound.h"
+#include "sound_output.h"
+#include "video_blit.h"
+#include "input.h"
+#include "menu.h"
+#include "config.h"
+#include "shared.h"
 
+static uint8_t rotate_tall, select_pressed_last_frame;
+static uint32_t rotate_joymap, SRAMSize;
 
-static uint8_t rotate_tall;
-static uint8_t select_pressed_last_frame;
+char GameName_emu[512];
 
-static uint32_t rotate_joymap;
-static SDL_Surface *screen;
-
-/* Color/Mono */
-uint32_t wsc = 1;			
+/* Color/Mono */		
 uint16_t WSButtonStatus;
-uint32_t rom_size;
-
-uint32_t done = 0;
-
-static void Reset(void)
-{
-	int u0;
-	v30mz_reset();				/* Reset CPU */
-	WSwan_MemoryReset();
-	WSwan_GfxReset();
-	WSwan_SoundReset();
-	WSwan_InterruptReset();
-	WSwan_RTCReset();
-	WSwan_EEPROMReset();
-
-	for(u0=0;u0<0xc9;u0++)
-	{
-		if(u0 != 0xC4 && u0 != 0xC5 && u0 != 0xBA && u0 != 0xBB)
-		{
-			WSwan_writeport(u0,startio[u0]);
-		}
-	}
-
-	v30mz_set_reg(NEC_SS,0);
-	v30mz_set_reg(NEC_SP,0x2000);
-}
-
+uint32_t rom_size, done = 0, wsc = 1;
 
 #ifdef FRAMESKIP
 static uint32_t Timer_Read(void) 
@@ -98,6 +77,28 @@ static const uint32_t TblSkip[8][8] = {
 };
 #endif
 
+static void Reset(void)
+{
+	int u0;
+	v30mz_reset();				/* Reset CPU */
+	WSwan_MemoryReset();
+	WSwan_GfxReset();
+	WSwan_SoundReset();
+	WSwan_InterruptReset();
+	WSwan_RTCReset();
+	WSwan_EEPROMReset();
+
+	for (u0=0;u0<0xc9;u0++)
+	{
+		if (u0 != 0xC4 && u0 != 0xC5 && u0 != 0xBA && u0 != 0xBB)
+		{
+			WSwan_writeport(u0,startio[u0]);
+		}
+	}
+
+	v30mz_set_reg(NEC_SS,0);
+	v30mz_set_reg(NEC_SP,0x2000);
+}
 
 static void Emulate(EmulateSpecStruct *espec)
 {
@@ -106,9 +107,9 @@ static void Emulate(EmulateSpecStruct *espec)
 #ifdef FRAMESKIP
 	SkipCnt++;
 	if (SkipCnt > 7) SkipCnt = 0;
-	while(!wsExecuteLine(screen->pixels, screen->w, TblSkip[FrameSkip][SkipCnt] ));
+	while(!wsExecuteLine((uint16_t* restrict)Draw_to_Virtual_Screen, width_of_surface, TblSkip[FrameSkip][SkipCnt] ));
 #else
-	while(!wsExecuteLine(screen->pixels, screen->w, 0 ));
+	while(!wsExecuteLine((uint16_t* restrict)Draw_to_Virtual_Screen, width_of_surface, 0 ));
 #endif
 	
 	espec->SoundBufSize = WSwan_SoundFlush(espec->SoundBuf, espec->SoundBufMaxSize);
@@ -116,9 +117,6 @@ static void Emulate(EmulateSpecStruct *espec)
 	espec->MasterCycles = v30mz_timestamp;
 	v30mz_timestamp = 0;
 }
-
-
-static uint32_t SRAMSize;
 
 static INLINE uint32_t next_pow2(uint32_t v)
 {
@@ -142,13 +140,15 @@ static uint32_t Load_Game(char* path)
 	uint32_t size;
 	
 	fp = fopen(path, "rb");
+	if (!fp) return 0;
+	
     fseek (fp, 0, SEEK_END);
     size = ftell (fp);
     
     /* Invalid Wonderswan ROM, too small */
 	if (size < 65536)
 	{
-		return(0);
+		return 0;
 	}
 	
 	fseek (fp, 0, SEEK_SET);
@@ -175,10 +175,10 @@ static uint32_t Load_Game(char* path)
 	switch(header[5])
 	{
 		case 0x01:
-			SRAMSize =   8 * 1024;
+			SRAMSize = 8 * 1024;
 		break;
 		case 0x02:
-			SRAMSize =  32 * 1024;
+			SRAMSize = 32 * 1024;
 		break;
 		case 0x03:
 			SRAMSize = 128 * 1024;
@@ -203,8 +203,10 @@ static uint32_t Load_Game(char* path)
 	}
 
 	uint16_t real_crc = 0;
-	for(uint32_t i = 0; i < rom_size - 2; i++)
+	for (uint_fast32_t i = 0; i < rom_size - 2; i++)
+	{
 		real_crc += wsCartROM[i];
+	}
 	printf("Real Checksum:      0x%04x\n", real_crc);
 
 	/* Detective Conan (Hack due to lack of prefetch) */
@@ -218,9 +220,11 @@ static uint32_t Load_Game(char* path)
 		wsCartROM[0xfffec] = 0x20;
 	}
 
-	if(header[6] & 0x1)
+	if (header[6] & 0x1)
 	{
 		//MDFNGameInfo->rotated = MDFN_ROTATE90;
+		/* Force rotate for Game's config file if header says game is portrait-only */
+		option.orientation_settings = 1;
 	}
 
 	MDFNMP_Init(16384, (1 << 20) / 1024);
@@ -236,10 +240,10 @@ static uint32_t Load_Game(char* path)
 
 	Reset();
 
-	return(1);
+	return 1;
 }
 
-static void CloseGame(void)
+void Unload_game()
 {
 	WSwan_MemoryKill();
 	WSwan_SoundKill();
@@ -249,32 +253,20 @@ static void CloseGame(void)
 		free(wsCartROM);
 		wsCartROM = NULL;
 	}
-}
-
-static void MDFNI_CloseGame(void)
-{
-	CloseGame();
 	MDFNMP_Kill();
 }
-
 
 void WS_reset(void)
 {
 	Reset();
 }
 
-void Unload_game()
-{
-	MDFNI_CloseGame();
-}
-
-
 static void Run_Emulator(void)
 {
 	static int16_t sound_buf[0x10000];
 
 	EmulateSpecStruct spec = {0};
-	spec.SoundRate = 44100;
+	spec.SoundRate = SOUND_OUTPUT_FREQUENCY;
 	spec.SoundBuf = sound_buf;
 	spec.SoundBufMaxSize = sizeof(sound_buf) / 2;
 	spec.SoundBufSize = 0;
@@ -309,7 +301,7 @@ static void Run_Emulator(void)
 
 }
 
-void *Get_memory_data(unsigned type)
+void *Get_memory_data(size_t type)
 {
    switch (type)
    {
@@ -329,7 +321,7 @@ void *Get_memory_data(unsigned type)
    return NULL;
 }
 
-size_t Get_memory_size(unsigned type)
+size_t Get_memory_size(size_t type)
 {
    switch (type)
    {
@@ -349,7 +341,7 @@ size_t Get_memory_size(unsigned type)
    return 0;
 }
 
-void EEPROM_file(char* path, uint32_t state)
+void EEPROM_file(char* path, uint_fast8_t state)
 {
 	FILE* fp;
 	if (state == 1)
@@ -372,7 +364,7 @@ void EEPROM_file(char* path, uint32_t state)
 	}
 }
 
-void SaveState(char* path, uint32_t state)
+void SaveState(char* path, uint_fast8_t state)
 {
 	FILE* fp;
 	if (state == 1)
@@ -402,6 +394,7 @@ void SaveState(char* path, uint32_t state)
 			WSwan_InterruptSaveState(0, fp);
 			WSwan_SoundSaveState(0, fp);
 			WSwan_EEPROMSaveState(0, fp);
+			fclose(fp);
 		}
 	}
 }
@@ -417,12 +410,10 @@ int main(int argc, char* argv[])
 		printf("Specify a ROM to load in memory\n");
 		return 0;
 	}
-    
-	SDL_Init( SDL_INIT_VIDEO );
-	SDL_ShowCursor(0);
+
+	snprintf(GameName_emu, sizeof(GameName_emu), "%s", basename(argv[1]));
 	
-    screen = SDL_SetVideoMode(224, 144, 16, SDL_HWSURFACE);
-	
+	Init_Video();
 	Audio_Init();
 
 	isloaded = Load_Game(argv[1]);
@@ -431,6 +422,9 @@ int main(int argc, char* argv[])
 		printf("Could not load ROM in memory\n");
 		return 0;
 	}
+	
+	/* Init_Configuration also takes care of EEPROM saves so execute it after the game has been loaded in memory. */
+	Init_Configuration();
    
 	rotate_tall = 0;
 	select_pressed_last_frame = 0;
@@ -446,20 +440,17 @@ int main(int argc, char* argv[])
 		switch(emulator_state)
 		{
 			case 0:
-				Menu();
+				Run_Emulator();
+				Update_Video_Ingame();
 			break;
 			case 1:
-				Run_Emulator();
-				SDL_Flip(screen);
+				Menu();
 			break;
 		}
     }
     
     Audio_Close();
-	//Deinit();
-
-    SDL_FreeSurface(screen);
-    SDL_Quit();
+	Close_Video();
 
     return 0;
 }

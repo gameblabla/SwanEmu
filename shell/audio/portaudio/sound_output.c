@@ -46,9 +46,9 @@ uint32_t Audio_Init()
 	outputParameters.hostApiSpecificStreamInfo = NULL;
 	
 #ifdef CALLBACK_AUDIO
-	Pa_OpenStream( &apu_stream, NULL, &outputParameters, 44100, 1024, paNoFlag, patestCallback, NULL);
+	Pa_OpenStream( &apu_stream, NULL, &outputParameters, SOUND_OUTPUT_FREQUENCY, 1024, paNoFlag, patestCallback, NULL);
 #else
-	Pa_OpenStream( &apu_stream, NULL, &outputParameters, 44100, 1024, paNoFlag, NULL, NULL);
+	Pa_OpenStream( &apu_stream, NULL, &outputParameters, SOUND_OUTPUT_FREQUENCY, 1024, paNoFlag, NULL, NULL);
 #endif
 	Pa_StartStream( apu_stream );
 	
