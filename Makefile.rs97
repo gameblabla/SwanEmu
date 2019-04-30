@@ -1,28 +1,43 @@
-PRGNAME     = oswan
+PRGNAME     = swanemu.elf
 CC          = /opt/rs97-toolchain/bin/mipsel-linux-gcc
+PROFILE		= 0
 
 # change compilation / linking flag options
-CFLAGS		=  -DMEDNAFEN_VERSION_NUMERIC=931 -DOSS_SOUND
-CFLAGS		+= -DLSB_FIRST -Imednafen -Imednafen/sound -DINLINE="inline" -DWANT_16BPP -DFRONTEND_SUPPORTS_RGB565 -DFRAMESKIP
 
+INCLUDES	= -Ishell/input/sdl -Icore -Icore/sound -Ishell/menu -Ishell/video/sdl -Ishell/audio -Ishell/scalers
+DEFINES		= -DLSB_FIRST -DINLINE="inline" -DWANT_16BPP -DFRONTEND_SUPPORTS_RGB565 -DSUPPORT_NATIVE_RESOLUTION
+DEFINES		+= -DOSS_SOUND -DFRAMESKIP
+
+CFLAGS		=  $(INCLUDES) $(DEFINES)
 CFLAGS		+= -std=gnu99 
-CFLAGS		+= -Ofast -fdata-sections -ffunction-sections  -mno-fp-exceptions -mno-interlink-compressed -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -mips32 -fno-PIC -mno-abicalls -flto -fwhole-program
-CFLAGS		+= -falign-functions=1 -falign-jumps=1 -falign-loops=1 -falign-labels=1 -mlong32 -mno-micromips
-#CFLAGS		+= -fprofile-generate=/home/retrofw/profile
-CFLAGS		+= -frename-registers -funroll-loops 
+CFLAGS		+= -Ofast -fdata-sections -ffunction-sections -mno-fp-exceptions -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -march=mips32 -mtune=mips32 
+CFLAGS		+= -fno-PIC -mno-abicalls
+CFLAGS		+= -mlong32 -mno-micromips -mno-interlink-compressed
 
-LDFLAGS     = -nodefaultlibs -lc -lgcc -lSDL -Wl,--as-needed -Wl,--gc-sections -flto -no-pie -s
+CFLAGS		+= $(FLTO_FLAGS) -funroll-loops -fsection-anchors
+CFLAGS		+= -fno-stack-protector -fomit-frame-pointer -falign-functions=1 -falign-jumps=1 -falign-loops=1
+ifeq ($(PROFILE), 1)
+CFLAGS 		+= -fprofile-generate=/home/retrofw/profile
+else ifeq ($(PROFILE), 2)
+CFLAGS		+= -fprofile-use -fbranch-probabilities
+endif
+
+LDFLAGS     = -lc -lm -lgcc -lSDL -Wl,--as-needed -Wl,--gc-sections -flto -fuse-linker-plugin -fwhole-program -no-pie -s
+ifeq ($(PROFILE), 1)
+LDFLAGS 	+= -lgcov
+endif
 
 # Files to be compiled
-SRCDIR    = ./mednafen ./mednafen/sound ./mednafen/wswan .
-VPATH     = $(SRCDIR)
-SRC_C   = $(foreach dir, $(SRCDIR), $(wildcard $(dir)/*.c))
-OBJ_C   = $(notdir $(patsubst %.c, %.o, $(SRC_C)))
-OBJS     = $(OBJ_C)
+SRCDIR 		= ./core ./core/sound ./core/wswan
+SRCDIR 		+= ./shell/video/sdl ./shell/audio/oss ./shell/input/sdl ./shell/menu ./shell/emu ./shell/scalers
+VPATH		= $(SRCDIR)
+SRC_C		= $(foreach dir, $(SRCDIR), $(wildcard $(dir)/*.c))
+OBJ_C		= $(notdir $(patsubst %.c, %.o, $(SRC_C)))
+OBJS		= $(OBJ_C)
 
 # Rules to make executable
-$(PRGNAME)$(EXESUFFIX): $(OBJS)  
-	$(CC) $(CFLAGS) -o $(PRGNAME)$(EXESUFFIX) $^ $(LDFLAGS)
+$(PRGNAME): $(OBJS)  
+	$(CC) $(CFLAGS) -o $(PRGNAME) $^ $(LDFLAGS)
 	
 $(OBJ_C) : %.o : %.c
 	$(CC) $(CFLAGS) -c -o $@ $<

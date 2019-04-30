@@ -7,12 +7,12 @@ INCLUDES	= -Ishell/input/sdl -Icore -Icore/sound -Ishell/menu -Ishell/video/sdl 
 DEFINES		= -DLSB_FIRST -DINLINE="inline" -DWANT_16BPP -DFRONTEND_SUPPORTS_RGB565
 DEFINES		+= -DOSS_SOUND -DFRAMESKIP
 
-CFLAGS		= -O0 -g -std=gnu99 $(INCLUDES) $(DEFINES)
-LDFLAGS     = -lSDL -lm -lasound
+CFLAGS		= -O2 -std=gnu99 $(INCLUDES) $(DEFINES)
+LDFLAGS     = -lSDL -lm
 
 # Files to be compiled
 SRCDIR 		= ./core ./core/sound ./core/wswan
-SRCDIR 		+= ./shell/video/sdl ./shell/audio/alsa ./shell/input/sdl ./shell/menu ./shell/emu ./shell/scalers
+SRCDIR 		+= ./shell/video/retrostone ./shell/audio/alsa ./shell/input/sdl ./shell/menu ./shell/emu ./shell/scalers
 VPATH		= $(SRCDIR)
 SRC_C		= $(foreach dir, $(SRCDIR), $(wildcard $(dir)/*.c))
 OBJ_C		= $(notdir $(patsubst %.c, %.o, $(SRC_C)))
