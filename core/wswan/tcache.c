@@ -23,14 +23,14 @@
 #include "wswan-memory.h"
 
 uint8_t	tiles[256][256][2][8];
-uint8_t	wsTCache[512*64];			
-uint8_t	wsTCache2[512*64];			
+uint8_t	wsTCache[512*64];
+uint8_t	wsTCache2[512*64];
 uint8_t	wsTCacheFlipped[512*64];
 uint8_t	wsTCacheFlipped2[512*64];
-uint8_t	wsTCacheUpdate[512];		
-uint8_t	wsTCacheUpdate2[512];		  
+uint8_t	wsTCacheUpdate[512];
+uint8_t	wsTCacheUpdate2[512];
 uint8_t	wsTileRow[8];
-uint32_t wsVMode;				
+uint32_t wsVMode;
 
 void WSWan_TCacheInvalidByAddr(uint32_t ws_offset)
 {

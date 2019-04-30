@@ -25,6 +25,7 @@
 #include "wswan-memory.h"
 
 #include "Blip_Buffer.h"
+#include "shared.h"
 
 static Blip_Synth WaveSynth;
 static Blip_Synth NoiseSynth;
@@ -219,68 +220,13 @@ void WSwan_SoundUpdate(void)
 
 void WSwan_SoundWrite(uint32_t A, uint8_t V)
 {
-   WSwan_SoundUpdate();
+	uint32_t ch;
+	WSwan_SoundUpdate();
 
-#ifdef NOCASE_RANGE
-   if(A >= 0x80 && A <= 0x87)
-   {
-      uint32_t ch = (A - 0x80) >> 1;
-
-      if(A & 1)
-         period[ch] = (period[ch] & 0x00FF) | ((V & 0x07) << 8);
-      else
-         period[ch] = (period[ch] & 0x0700) | ((V & 0xFF) << 0);
-   }
-   else if(A >= 0x88 && A <= 0x8B)
-   {
-      volume[A - 0x88] = V;
-   }
-   else if(A == 0x8C)
-      sweep_value = V;
-   else if(A == 0x8D)
-   {
-      sweep_step = V;
-      sweep_counter = sweep_step + 1;
-      sweep_8192_divider = 8192;
-   }
-   else if(A == 0x8E)
-   {
-      noise_control = V;
-      if(V & 0x8) nreg = 1;
-      //printf("NOISECONTROL: %02x\n", V);
-   }
-   else if(A == 0x90)
-   {
-      for(int n = 0; n < 4; n++)
-         if(!(control & (1 << n)) && (V & (1 << n)))
-         {
-            period_counter[n] = 0;
-            sample_pos[n] = 0x1F;
-         }
-      control = V;
-      //printf("Sound Control: %02x\n", V);
-   }
-   else if(A == 0x91)
-   {
-      output_control = V & 0xF;
-      //printf("%02x, %02x\n", V, (V >> 1) & 3);
-   }
-   else if(A == 0x92)
-      nreg = (nreg & 0xFF00) | (V << 0);
-   else if(A == 0x93)
-      nreg = (nreg & 0x00FF) | ((V & 0x7F) << 8);  
-   else if(A == 0x94)
-   {
-      voice_volume = V & 0xF;
-      //printf("%02x\n", V);
-   }
-   else
-#endif
-   switch(A)
-   {
-#ifndef NOCASE_RANGE
+	switch(A)
+	{
 		case 0x80 ... 0x87:
-			uint32_t ch = (A - 0x80) >> 1;
+			ch = (A - 0x80) >> 1;
 			if(A & 1)
 			{
 				period[ch] = (period[ch] & 0x00FF) | ((V & 0x07) << 8);
@@ -331,7 +277,6 @@ void WSwan_SoundWrite(uint32_t A, uint8_t V)
 		case 0x94:
 			voice_volume = V & 0xF;
 		break;
-#endif
 		case 0x8F: SampleRAMPos = V; break;
 		case 0x95: HyperVoice = V; break; // Pick a port, any port?!
                  //default: printf("%04x:%02x\n", A, V); break;
@@ -341,37 +286,21 @@ void WSwan_SoundWrite(uint32_t A, uint8_t V)
 
 uint8_t WSwan_SoundRead(uint32_t A)
 {
-   WSwan_SoundUpdate();
-
-#ifdef NOCASE_RANGE
-   if(A >= 0x80 && A <= 0x87)
-   {
-      uint32_t ch = (A - 0x80) >> 1;
-
-      if(A & 1)
-         return(period[ch] >> 8);
-      else
-         return(period[ch]);
-   }
-   else if(A >= 0x88 && A <= 0x8B)
-      return(volume[A - 0x88]);
-   else
-#endif
-   switch(A)
-   {
+	uint32_t ch;
+	WSwan_SoundUpdate();
+	switch(A)
+	{
 		default:
 			//printf("SoundRead: %04x\n", A);
 		break;
-#ifndef NOCASE_RANGE
 		case 0x80 ... 0x87:
-			uint32_t ch = (A - 0x80) >> 1;
+			ch = (A - 0x80) >> 1;
 			if(A & 1)
 				return(period[ch] >> 8);
 			else
 				return(period[ch]);
 		break;
 		case 0x88 ... 0x8B: return(volume[A - 0x88]);
-#endif
 		case 0x8C: return(sweep_value);
 		case 0x8D: return(sweep_step);
 		case 0x8E: return(noise_control);
@@ -429,7 +358,7 @@ void WSwan_SoundInit(void)
    for(i = 0; i < 2; i++)
    {
 		Blip_Buffer_init(&sbuf[i]);
-		Blip_Buffer_set_sample_rate(&sbuf[i], 44100, 60);
+		Blip_Buffer_set_sample_rate(&sbuf[i], SOUND_OUTPUT_FREQUENCY, 60);
 		Blip_Buffer_set_clock_rate(&sbuf[i], (long)(3072000));
 		Blip_Buffer_bass_freq(&sbuf[i], 20);
    }
@@ -451,7 +380,7 @@ uint32_t WSwan_SetSoundRate(uint32_t rate)
 	uint_fast8_t i;
 	for(i = 0; i < 2; i++)
 	{
-		Blip_Buffer_set_sample_rate(&sbuf[i], rate ? rate : 44100, 60);
+		Blip_Buffer_set_sample_rate(&sbuf[i], rate ? rate : SOUND_OUTPUT_FREQUENCY, 60);
 	}
 
 	return(true);

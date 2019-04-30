@@ -71,19 +71,6 @@ void WSwan_GfxWSCPaletteRAMWrite(uint32_t ws_offset, uint8_t data)
 
 void WSwan_GfxWrite(uint32_t A, uint8_t V)
 {
-#ifdef NOCASE_RANGE
-   if(A >= 0x1C && A <= 0x1F)
-   {
-      wsColors[(A - 0x1C) * 2 + 0] = 0xF - (V & 0xf);
-      wsColors[(A - 0x1C) * 2 + 1] = 0xF - (V >> 4);
-   }
-   else if(A >= 0x20 && A <= 0x3F)
-   {
-      wsMonoPal[(A - 0x20) >> 1][((A & 0x1) << 1) + 0] = V&7;
-      wsMonoPal[(A - 0x20) >> 1][((A & 0x1) << 1) | 1] = (V>>4)&7;
-   }
-   else
-#endif
    switch(A)
    {
 		case 0x00:
@@ -149,7 +136,6 @@ void WSwan_GfxWrite(uint32_t A, uint8_t V)
 		case 0x15:
 			LCDIcons = V;
 		break;
-#ifndef NOCASE_RANGE
 		case 0x1C ... 0x1F:
 			wsColors[(A - 0x1C) * 2 + 0] = 0xF - (V & 0xf);
 			wsColors[(A - 0x1C) * 2 + 1] = 0xF - (V >> 4);
@@ -158,7 +144,6 @@ void WSwan_GfxWrite(uint32_t A, uint8_t V)
 			wsMonoPal[(A - 0x20) >> 1][((A & 0x1) << 1) + 0] = V&7;
 			wsMonoPal[(A - 0x20) >> 1][((A & 0x1) << 1) | 1] = (V>>4)&7;
 		break;
-#endif
 		case 0x60:
 			VideoMode = V; 
 			wsSetVideo(V>>5, false); 
@@ -194,25 +179,11 @@ void WSwan_GfxWrite(uint32_t A, uint8_t V)
 
 uint8_t WSwan_GfxRead(uint32_t A)
 {
-#ifdef NOCASE_RANGE
-	if(A >= 0x1C && A <= 0x1F)
-	{
-		uint8_t ret = 0;
-
-		ret |= 0xF - wsColors[(A - 0x1C) * 2 + 0];
-		ret |= (0xF - wsColors[(A - 0x1C) * 2 + 1]) << 4;
-
-		return(ret);
-	}
-	else if(A >= 0x20 && A <= 0x3F)
-		return wsMonoPal[(A - 0x20) >> 1][((A & 0x1) << 1) + 0] | (wsMonoPal[(A - 0x20) >> 1][((A & 0x1) << 1) | 1] << 4);
-	else
-#endif
+	uint8_t ret;
 	switch(A)
 	{
-#ifndef NOCASE_RANGE
 		case 0x1C ... 0x1F:
-			uint8_t ret = 0;
+			ret = 0;
 			ret |= 0xF - wsColors[(A - 0x1C) * 2 + 0];
 			ret |= (0xF - wsColors[(A - 0x1C) * 2 + 1]) << 4;
 			return(ret);
@@ -220,7 +191,6 @@ uint8_t WSwan_GfxRead(uint32_t A)
 		case 0x20 ... 0x3F:
 			return wsMonoPal[(A - 0x20) >> 1][((A & 0x1) << 1) + 0] | (wsMonoPal[(A - 0x20) >> 1][((A & 0x1) << 1) | 1] << 4);
 		break;
-#endif
 		case 0x00:
 			return(DispControl);
 		case 0x01:
@@ -398,7 +368,7 @@ void wsScanline(uint16_t* restrict target)
 	uint8_t b_bg[256];
 	uint8_t b_bg_pal[256];
 
-	if(!wsVMode)
+	if (!wsVMode)
 	{
 		memset(b_bg, wsColors[BGColor&0xF]&0xF, 256);
 	}
@@ -606,7 +576,7 @@ void wsScanline(uint16_t* restrict target)
 				{
 				   if(wsVMode & 0x2)
 				   {
-						for (uint32_t x = 0; x < 8; x++)
+						for (int32_t x = 0; x < 8; x++)
 						{
 							if (wsTileRow[x])
 							{
@@ -632,7 +602,7 @@ void wsScanline(uint16_t* restrict target)
 				   }
 				   else
 				   {
-						for(uint32_t x = 0; x < 8; x++)
+						for(int32_t x = 0; x < 8; x++)
 						{
 							if(wsTileRow[x] || !(palette & 0x4))
 							{
@@ -658,7 +628,7 @@ void wsScanline(uint16_t* restrict target)
 				}
 				else
 				{
-					for(uint32_t x = 0; x < 8; x++)
+					for(int32_t x = 0; x < 8; x++)
 					{
 						if(wsTileRow[x] || !(palette & 4))
 						{

@@ -155,32 +155,24 @@ uint8_t WSwan_readport(uint32_t number)
 {
    number &= 0xFF;
 
-#ifdef NOCASE_RANGE
-	if (number >= 0x80 && number <= 0x9F)
-		return(WSwan_SoundRead(number));
-	else if (number <= 0x3F || (number >= 0xA0 && number <= 0xAF) || (number == 0x60))
-		return(WSwan_GfxRead(number));
-	else if ((number >= 0xBA && number <= 0xBE) || (number >= 0xC4 && number <= 0xC8))
-		return(WSwan_EEPROMRead(number));
-	else if (number >= 0xCA && number <= 0xCB)
-		return(WSwan_RTCRead(number));
-	else
-#endif
 	switch(number)
 	{
       //default: printf("Read: %04x\n", number); break;
-#ifndef NOCASE_RANGE
-		case 0x80 ... 0x9F: return(WSwan_SoundRead(number));
-		
+		case 0x80 ... 0x9F:
+			return(WSwan_SoundRead(number));
+			
 		case 0x00 ... 0x3F:
-		case 0xA0 ... 0xC8: return(WSwan_GfxRead(number));
+		case 0xA0 ... 0xAF:
+		case 0x60:
+			return(WSwan_GfxRead(number));
       
 		case 0xBA ... 0xBE:
-		case 0xC4 ... 0xAF:
-		case 0x60: return(WSwan_EEPROMRead(number));
+		case 0xC4 ... 0xC8:
+			return(WSwan_EEPROMRead(number));
 
-		case 0xCA ... 0xCB: return(WSwan_EEPROMRead(number));
-#endif
+		case 0xCA:
+		case 0xCB:
+			return(WSwan_RTCRead(number));
 		case 0x40: return(DMASource >> 0);
 		case 0x41: return(DMASource >> 8);
 		case 0x42: return(DMASource >> 16);
@@ -240,21 +232,9 @@ void WSwan_writeport(uint32_t IOPort, uint8_t V)
 {
 	IOPort &= 0xFF;
 
-#ifdef NOCASE_RANGE
-	if(IOPort >= 0x80 && IOPort <= 0x9F)
-		WSwan_SoundWrite(IOPort, V);
-	else if((IOPort <= 0x3F) || (IOPort >= 0xA0 && IOPort <= 0xAF) || (IOPort == 0x60))
-		WSwan_GfxWrite(IOPort, V);
-	else if((IOPort >= 0xBA && IOPort <= 0xBE) || (IOPort >= 0xC4 && IOPort <= 0xC8))
-		WSwan_EEPROMWrite(IOPort, V);
-	else if(IOPort >= 0xCA && IOPort <= 0xCB)
-		WSwan_RTCWrite(IOPort, V);
-	else
-#endif
 	switch(IOPort)
 	{
       //default: printf("%04x %02x\n", IOPort, V); break;
-#ifndef NOCASE_RANGE
 		case 0x80 ... 0x9F: WSwan_SoundWrite(IOPort, V); break;
 		
 		case 0x00 ... 0x3F:
@@ -269,7 +249,6 @@ void WSwan_writeport(uint32_t IOPort, uint8_t V)
 		case 0xCA:
 		case 0xCB:
 		WSwan_RTCWrite(IOPort, V); break;
-#endif
 		case 0x40: DMASource &= 0xFFFF00; DMASource |= (V << 0); break;
 		case 0x41: DMASource &= 0xFF00FF; DMASource |= (V << 8); break;
 		case 0x42: DMASource &= 0x00FFFF; DMASource |= ((V & 0x0F) << 16); break;
