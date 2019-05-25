@@ -92,17 +92,35 @@ uint8_t WSwan_readmem20(uint32_t A)
 
    switch(bank)
    {
-      case 0: 
-         return wsRAM[offset];
-      case 1:
-         if(sram_size)
-            return wsSRAM[(offset | (BankSelector[1] << 16)) & (sram_size - 1)];
-         return(0);
-      case 2:
-      case 3:
-         return wsCartROM[offset+((BankSelector[bank]&((rom_size>>16)-1))<<16)];
-      default: 
-         break;
+		case 0: 
+			return wsRAM[offset];
+		case 1:
+			if(sram_size)
+				return wsSRAM[(offset | (BankSelector[1] << 16)) & (sram_size - 1)];
+		return(0);
+		case 2:
+		case 3:
+			return wsCartROM[offset+((BankSelector[bank]&((rom_size>>16)-1))<<16)];
+		default: 
+		{
+			uint8_t bank_num = ((BankSelector[0] & 0xF) << 4) | (bank & 0xf);
+			bank_num &= (rom_size >> 16) - 1;
+			return(wsCartROM[(bank_num << 16) | offset]);
+			uint32_t rom_addr;
+
+			if(bank == 2 || bank == 3)
+			{
+				rom_addr = offset + ((BankSelector[bank] & ((rom_size >> 16) - 1)) << 16);
+			}
+			else
+			{
+				uint8_t bank_num = (((BankSelector[0] & 0xF) << 4) | (bank & 0xf)) & ((rom_size >> 16) - 1);
+				rom_addr = (bank_num << 16) | offset; 
+			}
+
+			return wsCartROM[rom_addr];
+		}
+		break;
    }
 
    bank_num = ((BankSelector[0] & 0xF) << 4) | (bank & 0xf);
@@ -188,17 +206,16 @@ void WSwan_CheckSoundDMA(void)
 
 uint8_t WSwan_readport(uint32_t number)
 {
-   number &= 0xFF;
+	number &= 0xFF;
 
 	switch(number)
 	{
-      //default: printf("Read: %04x\n", number); break;
+		//default: printf("Read: %04x\n", number); break;
 		case 0x6A:
 		case 0x6B:
 		case 0x80 ... 0x9F:
 			return(WSwan_SoundRead(number));
 			
-		case 0x00 ... 0x3F:
 		case 0xA0 ... 0xAF:
 		case 0x60:
 			return(WSwan_GfxRead(number));
@@ -255,14 +272,21 @@ uint8_t WSwan_readport(uint32_t number)
 			uint8_t ret = (ButtonWhich << 4) | ButtonReadLatch;
 			return(ret);
 		}
+		default:
+		break;
 	}
-
-	if(number >= 0xC8)
+	
+	/* This doesn't work well when using Case ranges inside of switch statement so do it after switch */
+	if (number <= 0x3F)
+	{
+		return(WSwan_GfxRead(number));
+	}
+	else if (number >= 0xC8)
 	{
 		return(0xD0 | language);
 	}
 
-   return(0);
+	return(0);
 }
 
 void WSwan_writeport(uint32_t IOPort, uint8_t V)
