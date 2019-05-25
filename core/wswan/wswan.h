@@ -10,8 +10,20 @@
 
 #define  mBCD(value) (((value)/10)<<4)|((value)%10)
 
-extern          uint32_t rom_size;
-extern          int wsc;
+#define min(a,b) \
+	({ \
+	__auto_type _a = (a); \
+	__auto_type _b = (b); \
+	_a < _b ? _a : _b; })
+
+#define max(a,b) \
+	({ \
+	__auto_type _a = (a); \
+	__auto_type _b = (b); \
+	_a > _b ? _a : _b; })
+
+extern uint32_t rom_size;
+extern int wsc;
 
 enum
 {
