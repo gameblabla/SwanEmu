@@ -39,7 +39,9 @@
 #include "scaler.h"
 #include "config.h"
 
-SDL_Surface *sdl_screen, *backbuffer, *wswan_vs;
+extern uint32_t wsVMode;
+
+SDL_Surface *sdl_screen, *backbuffer, *wswan_vs, *wswan_vs_rot;
 
 uint32_t width_of_surface;
 uint32_t* Draw_to_Virtual_Screen;
@@ -50,11 +52,13 @@ void Init_Video()
 	
 	SDL_ShowCursor(0);
 	
-	sdl_screen = SDL_SetVideoMode(0, 0, 16, SDL_HWSURFACE);
+	sdl_screen = SDL_SetVideoMode(680, 448, 16, SDL_HWSURFACE);
 	
 	backbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, 0,0,0,0);
 	
 	wswan_vs = SDL_CreateRGBSurface(SDL_SWSURFACE, INTERNAL_WSWAN_WIDTH, INTERNAL_WSWAN_HEIGHT, 16, 0,0,0,0);
+	
+	wswan_vs_rot = SDL_CreateRGBSurface(SDL_SWSURFACE, INTERNAL_WSWAN_HEIGHT, INTERNAL_WSWAN_WIDTH, 16, 0,0,0,0);
 
 	Set_Video_InGame();
 }
@@ -70,23 +74,9 @@ void Set_Video_Menu()
 
 void Set_Video_InGame()
 {
-	switch(option.fullscreen) 
-	{
-		// Native
-		#ifdef SUPPORT_NATIVE_RESOLUTION
-        case 0:
-			/* For drawing to Wonderswan screen */
-			if (sdl_screen->w != INTERNAL_WSWAN_WIDTH) sdl_screen = SDL_SetVideoMode(224, 144, 16, SDL_HWSURFACE);
-			Draw_to_Virtual_Screen = sdl_screen->pixels;
-			width_of_surface = sdl_screen->w;
-        break;
-        #endif
-        default:
-			if (sdl_screen->w != HOST_WIDTH_RESOLUTION) sdl_screen = SDL_SetVideoMode(HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, SDL_HWSURFACE);
-			Draw_to_Virtual_Screen = wswan_vs->pixels;
-			width_of_surface = INTERNAL_WSWAN_WIDTH;
-        break;
-    }
+	if (sdl_screen->w != HOST_WIDTH_RESOLUTION) sdl_screen = SDL_SetVideoMode(HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, SDL_HWSURFACE);
+	Draw_to_Virtual_Screen = wswan_vs->pixels;
+	width_of_surface = INTERNAL_WSWAN_WIDTH;
 }
 
 void Close_Video()
@@ -94,6 +84,7 @@ void Close_Video()
 	if (sdl_screen) SDL_FreeSurface(sdl_screen);
 	if (backbuffer) SDL_FreeSurface(backbuffer);
 	if (wswan_vs) SDL_FreeSurface(wswan_vs);
+	if (wswan_vs_rot) SDL_FreeSurface(wswan_vs_rot);
 	SDL_Quit();
 }
 
@@ -102,38 +93,59 @@ void Update_Video_Menu()
 	SDL_Flip(sdl_screen);
 }
 
+static void rotate_90_ccw(uint16_t* restrict dst, uint16_t* restrict src)
+{
+    int32_t h = 224, w = 144;
+    src += w * h - 1;
+    for (int32_t col = w - 1; col >= 0; --col)
+    {
+        uint16_t *outcol = dst + col;
+        for(int32_t row = 0; row < h; ++row, outcol += w)
+        {
+            *outcol = *src--;
+		}
+    }
+}
+
 void Update_Video_Ingame()
 {
-#ifndef SUPPORT_NATIVE_RESOLUTION
-	uint32_t y, pitch;
-	uint16_t *src, *dst;
-#endif
-	SDL_Rect pos;
+	uint32_t internal_width, internal_height, keep_aspect_width, keep_aspect_height;
+	uint16_t* restrict source_graph;
+	
+	if ((wsVMode == 7 && option.orientation_settings != 2) || option.orientation_settings == 1)
+	{
+		rotate_90_ccw((uint16_t* restrict)wswan_vs_rot->pixels, (uint16_t* restrict)wswan_vs->pixels);
+		internal_width = INTERNAL_WSWAN_HEIGHT;
+		internal_height = INTERNAL_WSWAN_WIDTH;
+		source_graph = (uint16_t* restrict)wswan_vs_rot->pixels;
+		keep_aspect_width =  ((HOST_HEIGHT_RESOLUTION / INTERNAL_WSWAN_HEIGHT) * INTERNAL_WSWAN_WIDTH) / 2;
+		if (keep_aspect_width > HOST_WIDTH_RESOLUTION) keep_aspect_width -= HOST_WIDTH_RESOLUTION/2;
+		keep_aspect_height = HOST_HEIGHT_RESOLUTION;
+	}
+	else
+	{
+		internal_width = INTERNAL_WSWAN_WIDTH;
+		internal_height = INTERNAL_WSWAN_HEIGHT;
+		source_graph = (uint16_t* restrict)wswan_vs->pixels;
+		keep_aspect_width = HOST_WIDTH_RESOLUTION;
+		keep_aspect_height = ((HOST_WIDTH_RESOLUTION / INTERNAL_WSWAN_WIDTH) * INTERNAL_WSWAN_HEIGHT);
+		if (keep_aspect_height > HOST_HEIGHT_RESOLUTION) keep_aspect_height -= HOST_HEIGHT_RESOLUTION/4;
+	}
+	
 	SDL_LockSurface(sdl_screen);
 	
 	switch(option.fullscreen) 
 	{
-		#ifndef SUPPORT_NATIVE_RESOLUTION
+		// Fullscreen
 		case 0:
-		pitch = HOST_WIDTH_RESOLUTION;
-		src = (uint16_t* restrict)wswan_vs->pixels;
-		dst = (uint16_t* restrict)sdl_screen->pixels
-			+ ((HOST_WIDTH_RESOLUTION - INTERNAL_WSWAN_WIDTH) / 4) * sizeof(uint16_t)
-			+ ((HOST_HEIGHT_RESOLUTION - INTERNAL_WSWAN_HEIGHT) / 2) * pitch;
-		for (y = 0; y < INTERNAL_WSWAN_HEIGHT; y++)
-		{
-			memmove(dst, src, INTERNAL_WSWAN_WIDTH * sizeof(uint16_t));
-			src += INTERNAL_WSWAN_WIDTH;
-			dst += pitch;
-		}
+			bitmap_scale(0,0,internal_width,internal_height,internal_width*2,internal_height*2,internal_width, HOST_WIDTH_RESOLUTION - (internal_width*2),(uint16_t* restrict)source_graph,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-(internal_width*2))/2+(HOST_HEIGHT_RESOLUTION-(internal_height*2))/2*HOST_WIDTH_RESOLUTION);
 		break;
-		#endif
 		// Fullscreen
 		case 1:
-			bitmap_scale(0, 0, INTERNAL_WSWAN_WIDTH, INTERNAL_WSWAN_HEIGHT, HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, INTERNAL_WSWAN_WIDTH, 0, (uint16_t* restrict)wswan_vs->pixels, (uint16_t* restrict)sdl_screen->pixels);
+			bitmap_scale(0, 0, internal_width, internal_height, HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, internal_width, 0, (uint16_t* restrict)source_graph, (uint16_t* restrict)sdl_screen->pixels);
 		break;
 		case 2:
-			bitmap_scale(0,0,INTERNAL_WSWAN_WIDTH,INTERNAL_WSWAN_HEIGHT,320,206,INTERNAL_WSWAN_WIDTH,0,(uint16_t* restrict)wswan_vs->pixels,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-320)/2+(HOST_HEIGHT_RESOLUTION-206)/2*HOST_WIDTH_RESOLUTION);
+			bitmap_scale(0,0,internal_width,internal_height,keep_aspect_width,keep_aspect_height,internal_width, HOST_WIDTH_RESOLUTION - keep_aspect_width,(uint16_t* restrict)source_graph,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-keep_aspect_width)/2+(HOST_HEIGHT_RESOLUTION-keep_aspect_height)/2*HOST_WIDTH_RESOLUTION);
 		break;
 		// Hqx
 		case 3:

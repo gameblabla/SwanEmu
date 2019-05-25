@@ -18,10 +18,25 @@ int32_t update_input(void)
 	{
 		isrotated = 1;
 	}
-
-	SDL_PollEvent(&event);
-	keys = SDL_GetKeyState(NULL);
 	
+	while (SDL_PollEvent(&event))
+	{
+		switch(event.type)
+		{
+			case SDL_KEYDOWN:
+				switch(event.key.keysym.sym)
+				{
+					case SDLK_END:
+					case SDLK_RCTRL:
+					case SDLK_ESCAPE:
+						emulator_state = 1;
+					break;
+				}
+			break;
+		}
+	}
+	
+	keys = SDL_GetKeyState(NULL);
 	// UP -> Y1
 	if (keys[option.config_buttons[isrotated][0] ] == SDL_PRESSED)
 	{
@@ -92,12 +107,6 @@ int32_t update_input(void)
 	if (keys[option.config_buttons[isrotated][11] ] == SDL_PRESSED)
 	{
 		button |= (1<<11);
-	}
-	
-	
-	if ( keys[SDLK_ESCAPE] || keys[SDLK_RCTRL] || keys[SDLK_END] )
-	{
-		emulator_state = 1;
 	}
 	
 	return button;

@@ -79,8 +79,9 @@ static const uint32_t TblSkip[8][8] = {
 
 static void Reset(void)
 {
-	int u0;
-	v30mz_reset();				/* Reset CPU */
+	uint_fast8_t u0;
+	/* Reset CPU */
+	v30mz_reset();
 	WSwan_MemoryReset();
 	WSwan_GfxReset();
 	WSwan_SoundReset();

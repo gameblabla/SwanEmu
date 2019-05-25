@@ -144,11 +144,11 @@ static const char* Return_Text_Button(uint32_t button)
 		break;
 		/* X button */
 		case 304:
-			return "TA button";
+			return "X button";
 		break;
 		/* Y button */
 		case 32:
-			return "TB button";
+			return "Y button";
 		break;
 		/* L button */
 		case 9:
@@ -160,11 +160,13 @@ static const char* Return_Text_Button(uint32_t button)
 		break;
 		/* Power button */
 		case 279:
-			return "POWER";
+			return "L2 button";
+			//return "POWER";
 		break;
 		/* Brightness */
 		case 34:
-			return "Brightness";
+			return "R2 button";
+			//return "Brightness";
 		break;
 		/* Volume - */
 		case 38:
@@ -347,19 +349,10 @@ void Menu()
 	char text[50];
     int16_t pressed = 0;
     int16_t currentselection = 1;
-    uint16_t miniscreenwidth = 112;
-    uint16_t miniscreenheight = 72;
     SDL_Rect dstRect;
     SDL_Event Event;
     
     Set_Video_Menu();
-    
-    SDL_Surface* miniscreen = SDL_CreateRGBSurface(SDL_SWSURFACE, miniscreenwidth, miniscreenheight, 16, sdl_screen->format->Rmask, sdl_screen->format->Gmask, sdl_screen->format->Bmask, sdl_screen->format->Amask);
-
-    SDL_LockSurface(miniscreen);
-	bitmap_scale(0,0,224,144,miniscreenwidth,miniscreenheight,224,0,(uint16_t* restrict)wswan_vs->pixels,(uint16_t* restrict)miniscreen->pixels);
-        
-    SDL_UnlockSurface(miniscreen);
     
 	/* Save eeprom settings each time we bring up the menu */
 	EEPROM_Menu(0);
@@ -367,11 +360,8 @@ void Menu()
     while (((currentselection != 1) && (currentselection != 7)) || (!pressed))
     {
         pressed = 0;
- 		SDL_FillRect( backbuffer, NULL, 0 );
-		
-        dstRect.x = HOST_WIDTH_RESOLUTION-10-miniscreenwidth;
-        dstRect.y = 56;
-        SDL_BlitSurface(miniscreen,NULL,backbuffer,&dstRect);
+        
+        SDL_FillRect( backbuffer, NULL, 0 );
 
 		print_string("SwanEmu - Built on " __DATE__, TextWhite, 0, 5, 15, backbuffer->pixels);
 		
@@ -467,6 +457,8 @@ void Menu()
                         if (currentselection == 8)
                             currentselection = 1;
                         break;
+                    case SDLK_END:
+                    case SDLK_RCTRL:
                     case SDLK_LALT:
 						pressed = 1;
 						currentselection = 1;
@@ -556,7 +548,7 @@ void Menu()
             }
         }
 
-		SDL_BlitSurface(backbuffer, NULL, sdl_screen, NULL);
+		bitmap_scale(0,0,320,240,sdl_screen->w,sdl_screen->h,320,0,(uint16_t* restrict)backbuffer->pixels,(uint16_t* restrict)sdl_screen->pixels);
 		SDL_Flip(sdl_screen);
     }
     
@@ -566,8 +558,6 @@ void Menu()
     SDL_FillRect(sdl_screen, NULL, 0);
     SDL_Flip(sdl_screen);
     #endif
-    
-    if (miniscreen) SDL_FreeSurface(miniscreen);
     
     if (currentselection == 7)
     {
