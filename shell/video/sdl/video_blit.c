@@ -129,8 +129,8 @@ void Update_Video_Ingame()
 #endif
 	uint32_t internal_width, internal_height, keep_aspect_width, keep_aspect_height;
 	uint16_t* restrict source_graph;
-	
-	if ((wsVMode == 7 && option.orientation_settings != 2) || option.orientation_settings == 1)
+
+	if ((Wswan_IsVertical() == 1 && option.orientation_settings != 2) || option.orientation_settings == 1)
 	{
 		rotate_90_ccw((uint16_t* restrict)wswan_vs_rot->pixels, (uint16_t* restrict)wswan_vs->pixels);
 		internal_width = INTERNAL_WSWAN_HEIGHT;
