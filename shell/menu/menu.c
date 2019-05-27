@@ -97,6 +97,9 @@ static void config_load()
 				
 		option.config_buttons[1][10] = 0;
 		option.config_buttons[1][11] = 0;
+		
+		/* Set default to keep aspect */
+		option.fullscreen = 2;
 	}
 }
 
@@ -161,12 +164,10 @@ static const char* Return_Text_Button(uint32_t button)
 		/* Power button */
 		case 279:
 			return "L2 button";
-			//return "POWER";
 		break;
 		/* Brightness */
 		case 34:
 			return "R2 button";
-			//return "Brightness";
 		break;
 		/* Volume - */
 		case 38:
@@ -185,6 +186,9 @@ static const char* Return_Text_Button(uint32_t button)
 			return "Select button";
 		break;
 		default:
+			return "Unknown key";
+		break;
+		case 0:
 			return "...";
 		break;
 	}	
@@ -255,16 +259,17 @@ static void Input_Remapping()
 
         if (pressed)
         {
+			SDL_Delay(1);
             switch(currentselection)
             {
                 default:
-					SDL_FillRect( backbuffer, NULL, 0 );
-					print_string("Please press button for mapping", TextWhite, TextBlue, 37, 108, backbuffer->pixels);
-					bitmap_scale(0,0,320,240,sdl_screen->w,sdl_screen->h,320,0,(uint16_t* restrict)backbuffer->pixels,(uint16_t* restrict)sdl_screen->pixels);
-					SDL_Flip(sdl_screen);
 					exit_map = 0;
 					while( !exit_map )
 					{
+						SDL_FillRect( backbuffer, NULL, 0 );
+						print_string("Please press button for mapping", TextWhite, TextBlue, 37, 108, backbuffer->pixels);
+						bitmap_scale(0,0,320,240,sdl_screen->w,sdl_screen->h,320,0,(uint16_t* restrict)backbuffer->pixels,(uint16_t* restrict)sdl_screen->pixels);
+						
 						while (SDL_PollEvent(&Event))
 						{
 							if (Event.type == SDL_KEYDOWN)
@@ -276,6 +281,7 @@ static void Input_Remapping()
 								}
 							}
 						}
+						SDL_Flip(sdl_screen);
 					}
 				break;
             }
@@ -425,7 +431,7 @@ void Menu()
 				snprintf(text, sizeof(text), "Orientation : Vertical");
 			break;
 			case 2:
-				snprintf(text, sizeof(text), "Orientation : No rotate");
+				snprintf(text, sizeof(text), "Orientation : No rotate/No invert");
 			break;
 		}
 			
