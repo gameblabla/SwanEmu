@@ -62,7 +62,7 @@ uint32_t Audio_Init()
 	if (rc < 0)
 	{
 		fprintf(stderr, "Error:snd_pcm_hw_params_set_format %s\n", snd_strerror(rc));
-		return;
+		return 1;
 	}
 
 	/* Two channels (stereo) */
