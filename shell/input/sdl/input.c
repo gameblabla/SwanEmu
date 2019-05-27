@@ -2,10 +2,11 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "mednafen.h"
+#include "wswan/gfx.h"
+
 #include "menu.h"
 #include "config.h"
-
-extern uint32_t wsVMode;
 
 int32_t update_input(void)
 {
@@ -14,29 +15,17 @@ int32_t update_input(void)
 	uint8_t* keys;
 	uint32_t isrotated = 0;
 
-	if (wsVMode == 7 || option.orientation_settings > 0)
+	if (Wswan_IsVertical() == 1|| option.orientation_settings > 0)
 	{
 		isrotated = 1;
 	}
 	
-	while (SDL_PollEvent(&event))
-	{
-		switch(event.type)
-		{
-			case SDL_KEYDOWN:
-				switch(event.key.keysym.sym)
-				{
-					case SDLK_END:
-					case SDLK_RCTRL:
-					case SDLK_ESCAPE:
-						emulator_state = 1;
-					break;
-				}
-			break;
-		}
-	}
-	
 	keys = SDL_GetKeyState(NULL);
+	
+	SDL_PollEvent(&event);
+	
+	if (keys[SDLK_RETURN] == SDL_PRESSED && keys[SDLK_ESCAPE] == SDL_PRESSED) emulator_state = 1;
+
 	// UP -> Y1
 	if (keys[option.config_buttons[isrotated][0] ] == SDL_PRESSED)
 	{
