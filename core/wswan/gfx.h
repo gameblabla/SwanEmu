@@ -1,6 +1,7 @@
 #ifndef WSWAN_GFX_H
 #define WSWAN_GFX_H
 
+uint_fast8_t Wswan_IsVertical(void);
 
 void WSWan_TCacheInvalidByAddr(uint32_t);
 

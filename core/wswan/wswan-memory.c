@@ -491,7 +491,7 @@ void WSwan_MemorySaveState(uint32_t load, FILE* fp)
 		fwrite(&SoundDMALength, sizeof(uint8_t), sizeof(SoundDMALength), fp);
 		fwrite(&SoundDMALengthSaved, sizeof(uint8_t), sizeof(SoundDMALengthSaved), fp);
 		fwrite(&SoundDMAControl, sizeof(uint8_t), sizeof(SoundDMAControl), fp);
-		fread(&SoundDMATimer, sizeof(uint8_t), sizeof(SoundDMATimer), fp);
+		fwrite(&SoundDMATimer, sizeof(uint8_t), sizeof(SoundDMATimer), fp);
 		fwrite(&CommControl, sizeof(uint8_t), sizeof(CommControl), fp);
 		fwrite(&CommData, sizeof(uint8_t), sizeof(CommData), fp);
 		fwrite(&BankSelector, sizeof(uint8_t), sizeof(BankSelector), fp);

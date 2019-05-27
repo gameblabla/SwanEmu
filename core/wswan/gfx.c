@@ -60,6 +60,12 @@ static uint16_t VBTimerPeriod;
 static uint16_t HBCounter, VBCounter;
 static uint8_t VideoMode;
 
+uint_fast8_t Wswan_IsVertical(void)
+{
+	if (LCDIcons == 2) return 1;
+	return 0;
+}
+
 void WSwan_GfxInit(void)
 {
 	LayerEnabled = 7; // BG, FG, sprites
