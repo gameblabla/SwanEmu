@@ -65,15 +65,12 @@ static uint32_t Timer_Read(void)
 }
 static long lastTick = 0, newTick;
 static uint32_t SkipCnt = 0, video_frames = 0, FPS = 75, FrameSkip;
-static const uint32_t TblSkip[8][8] = {
-    {0, 0, 0, 0, 0, 0, 0, 0},
-    {0, 0, 0, 0, 0, 0, 0, 1},
-    {0, 0, 0, 0, 0, 0, 1, 1},
-    {0, 0, 0, 0, 0, 1, 1, 1},
-    {0, 0, 0, 0, 1, 1, 1, 1},
-    {0, 0, 0, 1, 1, 1, 1, 1},
-    {0, 0, 1, 1, 1, 1, 1, 1},
-    {0, 1, 1, 1, 1, 1, 1, 1},
+static const uint32_t TblSkip[5][5] = {
+    {0, 0, 0, 0, 0},
+    {0, 0, 0, 0, 1},
+    {0, 0, 0, 1, 1},
+    {0, 0, 1, 1, 1},
+    {0, 1, 1, 1, 1},
 };
 #endif
 
@@ -107,7 +104,7 @@ static void Emulate(EmulateSpecStruct *espec)
 
 #ifdef FRAMESKIP
 	SkipCnt++;
-	if (SkipCnt > 7) SkipCnt = 0;
+	if (SkipCnt > 4) SkipCnt = 0;
 	while(!wsExecuteLine((uint16_t* restrict)Draw_to_Virtual_Screen, width_of_surface, TblSkip[FrameSkip][SkipCnt] ));
 #else
 	while(!wsExecuteLine((uint16_t* restrict)Draw_to_Virtual_Screen, width_of_surface, 0 ));
@@ -220,10 +217,30 @@ static uint32_t Load_Game(char* path)
 		wsCartROM[0xfffeb] = 0x00;
 		wsCartROM[0xfffec] = 0x20;
 	}
+	/* Digimon Battle Spirits 1.5 has a hidden english translation that is disabled.
+	 * This enables it back. */
+	else if (real_crc == 0x443e)
+	{
+		const uint32_t table_topatch[29] =
+		{
+			0x75077B, 0x755956, 0x75A716, 0x75A734,
+			0x75A74E, 0x76DAEC, 0x7700E7, 0x770A57,
+			0x77120A, 0x772150, 0x77567B, 0x775818,
+			0x77708F, 0x77732A, 0x7773DA, 0x777467,
+			0x7788A9, 0x779F27, 0x77E489, 0x77FF59,
+			0x780048, 0x780075, 0x78008F, 0x78014A,
+			0x780DFB, 0x78280E, 0x786204, 0x786292,
+			0x786339
+		};
+		for(uint32_t i=0;i<sizeof(table_topatch)/sizeof(uint32_t);i++)
+		{
+			wsCartROM[table_topatch[i]] = 0xB0;
+			wsCartROM[table_topatch[i]+0x000001] = 0x01;
+		}
+	}
 
 	if (header[6] & 0x1)
 	{
-		//MDFNGameInfo->rotated = MDFN_ROTATE90;
 		/* Force rotate for Game's config file if header says game is portrait-only */
 		option.orientation_settings = 1;
 	}
@@ -295,7 +312,7 @@ static void Run_Emulator(void)
 		else
 		{
 			FrameSkip = 75 / FPS;
-			if (FrameSkip > 7) FrameSkip = 7;
+			if (FrameSkip > 4) FrameSkip = 4;
 		}
 	}
 #endif

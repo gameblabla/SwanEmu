@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "shared.h"
+
 static PaStream *apu_stream;
 
 #ifdef CALLBACK_AUDIO
@@ -38,7 +40,7 @@ uint32_t Audio_Init()
 	if (outputParameters.device == paNoDevice) 
 	{
 		printf("No sound output\n");
-		return EXIT_FAILURE;
+		return 1;
 	}
 
 	outputParameters.channelCount = 2;
@@ -61,3 +63,8 @@ void Audio_Write(int16_t* restrict buffer, uint32_t buffer_size)
 	Pa_WriteStream( apu_stream, buffer, buffer_size);
 }
 #endif
+
+void Audio_Close()
+{
+	//Pa_Close();
+}

@@ -39,8 +39,6 @@
 #include "scaler.h"
 #include "config.h"
 
-extern uint32_t wsVMode;
-
 SDL_Surface *sdl_screen, *backbuffer, *wswan_vs, *wswan_vs_rot;
 
 uint32_t width_of_surface;
@@ -52,7 +50,7 @@ void Init_Video()
 	
 	SDL_ShowCursor(0);
 	
-	sdl_screen = SDL_SetVideoMode(680, 448, 16, SDL_HWSURFACE);
+	sdl_screen = SDL_SetVideoMode(0, 0, 16, SDL_HWSURFACE);
 	
 	backbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, 0,0,0,0);
 	
@@ -132,25 +130,26 @@ void Update_Video_Ingame()
 		if (keep_aspect_height > HOST_HEIGHT_RESOLUTION) keep_aspect_height -= HOST_HEIGHT_RESOLUTION/4;
 	}
 	
-	SDL_LockSurface(sdl_screen);
-	
-	switch(option.fullscreen) 
+	if (SDL_LockSurface(sdl_screen) == 0)
 	{
-		// Fullscreen
-		case 0:
-			bitmap_scale(0,0,internal_width,internal_height,internal_width*2,internal_height*2,internal_width, HOST_WIDTH_RESOLUTION - (internal_width*2),(uint16_t* restrict)source_graph,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-(internal_width*2))/2+(HOST_HEIGHT_RESOLUTION-(internal_height*2))/2*HOST_WIDTH_RESOLUTION);
-		break;
-		// Fullscreen
-		case 1:
-			bitmap_scale(0, 0, internal_width, internal_height, HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, internal_width, 0, (uint16_t* restrict)source_graph, (uint16_t* restrict)sdl_screen->pixels);
-		break;
-		case 2:
-			bitmap_scale(0,0,internal_width,internal_height,keep_aspect_width,keep_aspect_height,internal_width, HOST_WIDTH_RESOLUTION - keep_aspect_width,(uint16_t* restrict)source_graph,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-keep_aspect_width)/2+(HOST_HEIGHT_RESOLUTION-keep_aspect_height)/2*HOST_WIDTH_RESOLUTION);
-		break;
-		// Hqx
-		case 3:
-		break;
+		switch(option.fullscreen) 
+		{
+			// Fullscreen
+			case 0:
+				bitmap_scale(0,0,internal_width,internal_height,internal_width*2,internal_height*2,internal_width, HOST_WIDTH_RESOLUTION - (internal_width*2),(uint16_t* restrict)source_graph,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-(internal_width*2))/2+(HOST_HEIGHT_RESOLUTION-(internal_height*2))/2*HOST_WIDTH_RESOLUTION);
+			break;
+			// Fullscreen
+			case 1:
+				bitmap_scale(0, 0, internal_width, internal_height, HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, internal_width, 0, (uint16_t* restrict)source_graph, (uint16_t* restrict)sdl_screen->pixels);
+			break;
+			case 2:
+				bitmap_scale(0,0,internal_width,internal_height,keep_aspect_width,keep_aspect_height,internal_width, HOST_WIDTH_RESOLUTION - keep_aspect_width,(uint16_t* restrict)source_graph,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-keep_aspect_width)/2+(HOST_HEIGHT_RESOLUTION-keep_aspect_height)/2*HOST_WIDTH_RESOLUTION);
+			break;
+			// Hqx
+			case 3:
+			break;
+		}
+		SDL_UnlockSurface(sdl_screen);	
 	}
-	SDL_UnlockSurface(sdl_screen);	
 	SDL_Flip(sdl_screen);
 }

@@ -166,7 +166,7 @@ static const char* Return_Text_Button(uint32_t button)
 			return "L2 button";
 		break;
 		/* Brightness */
-		case 34:
+		case 51:
 			return "R2 button";
 		break;
 		/* Volume - */
