@@ -273,7 +273,9 @@ uint32_t wsExecuteLine(uint16_t* restrict pixels, uint8_t pitch, const uint32_t 
 {
 	uint32_t ret = false;
 	
+	#ifdef FRAMESKIP
 	if (!skip)
+	#endif
 	{
 		if (wsLine < 144)
 		{
