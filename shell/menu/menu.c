@@ -364,6 +364,9 @@ void Menu()
     SDL_Rect dstRect;
     SDL_Event Event;
     
+	/* This is done in order to avoid desync issues */
+	Audio_Close();
+    
     Set_Video_Menu();
     
 	/* Save eeprom settings each time we bring up the menu */
@@ -582,6 +585,9 @@ void Menu()
 	Set_Video_InGame();
     
     Set_Video_Menu_Quit();
+    
+	/* This is done in order to avoid desync issues */
+    Audio_Init();
 }
 
 static void Cleanup(void)
