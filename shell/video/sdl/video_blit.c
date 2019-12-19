@@ -107,6 +107,11 @@ void Update_Video_Menu()
 	SDL_Flip(sdl_screen);
 }
 
+void Set_Video_Menu_Quit()
+{
+	set_keep_aspect_ratio(option.fullscreen);
+}
+
 static void rotate_90_ccw(uint16_t* restrict dst, uint16_t* restrict src)
 {
     int32_t h = 224, w = 144;
@@ -152,8 +157,18 @@ void Update_Video_Ingame()
 	
 	switch(option.fullscreen) 
 	{
-		#ifndef SUPPORT_NATIVE_RESOLUTION
+		// Fullscreen
 		case 0:
+			bitmap_scale(0, 0, internal_width, internal_height, HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, internal_width, 0, (uint16_t* restrict)source_graph, (uint16_t* restrict)sdl_screen->pixels);
+		break;
+		case 1:
+			bitmap_scale(0,0,internal_width,internal_height,keep_aspect_width,keep_aspect_height,internal_width, HOST_WIDTH_RESOLUTION - keep_aspect_width,(uint16_t* restrict)source_graph,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-keep_aspect_width)/2+(HOST_HEIGHT_RESOLUTION-keep_aspect_height)/2*HOST_WIDTH_RESOLUTION);
+		break;
+		// Hqx
+		case 2:
+		break;
+		#ifndef SUPPORT_NATIVE_RESOLUTION
+		case 3:
 			pitch = HOST_WIDTH_RESOLUTION;
 			src = (uint16_t* restrict)source_graph;
 			dst = (uint16_t* restrict)sdl_screen->pixels
@@ -167,16 +182,6 @@ void Update_Video_Ingame()
 			}
 		break;
 		#endif
-		// Fullscreen
-		case 1:
-			bitmap_scale(0, 0, internal_width, internal_height, HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, internal_width, 0, (uint16_t* restrict)source_graph, (uint16_t* restrict)sdl_screen->pixels);
-		break;
-		case 2:
-			bitmap_scale(0,0,internal_width,internal_height,keep_aspect_width,keep_aspect_height,internal_width, HOST_WIDTH_RESOLUTION - keep_aspect_width,(uint16_t* restrict)source_graph,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-keep_aspect_width)/2+(HOST_HEIGHT_RESOLUTION-keep_aspect_height)/2*HOST_WIDTH_RESOLUTION);
-		break;
-		// Hqx
-		case 3:
-		break;
 	}
 	SDL_UnlockSurface(sdl_screen);	
 	SDL_Flip(sdl_screen);
