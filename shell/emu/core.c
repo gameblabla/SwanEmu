@@ -101,6 +101,8 @@ static void Reset(void)
 static void Emulate(EmulateSpecStruct *espec)
 {
 	WSButtonStatus = update_input();
+	
+	LOCK_VIDEO
 
 #ifdef FRAMESKIP
 	SkipCnt++;
@@ -109,6 +111,8 @@ static void Emulate(EmulateSpecStruct *espec)
 #else
 	while(!wsExecuteLine((uint16_t* restrict)Draw_to_Virtual_Screen, width_of_surface, 0 ));
 #endif
+
+	UNLOCK_VIDEO
 	
 	espec->SoundBufSize = WSwan_SoundFlush(espec->SoundBuf, espec->SoundBufMaxSize);
 
