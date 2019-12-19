@@ -41,60 +41,113 @@
 
 extern uint32_t wsVMode;
 
-SDL_Surface *sdl_screen, *backbuffer, *wswan_vs, *wswan_vs_rot;
+SDL_Surface *sdl_screen, *backbuffer, *wswan_vs;
 
 uint32_t width_of_surface;
 uint32_t* Draw_to_Virtual_Screen;
+uint_fast8_t aspect_ratio_hw = 0;
+
+/* Wonderswan games run at 75 Hz, stick with Single buffering and sync to Audio instead. */
+#define FLAGS_SDL SDL_HWSURFACE
+
+#ifdef ENABLE_JOYSTICKCODE
+static SDL_Joystick *sdl_joy;
+#endif
+
+#if !IPU_SCALING_NONATIVE
+#error "GCW0 port requires IPU_SCALING_NONATIVE to be defined"
+#endif
+
+static const char *KEEP_ASPECT_FILENAME = "/sys/devices/platform/jz-lcd.0/keep_aspect_ratio";
+
+static inline uint_fast8_t get_keep_aspect_ratio()
+{
+	FILE *f = fopen(KEEP_ASPECT_FILENAME, "rb");
+	if (!f) return 0;
+	char c;
+	fread(&c, 1, 1, f);
+	fclose(f);
+	return c == 'Y';
+}
+
+static inline void set_keep_aspect_ratio(uint_fast8_t n)
+{
+	FILE *f = fopen(KEEP_ASPECT_FILENAME, "wb");
+	if (!f) return;
+	char c = n ? 'Y' : 'N';
+	fwrite(&c, 1, 1, f);
+	fclose(f);
+}
 
 void Init_Video()
 {
-	SDL_Init( SDL_INIT_VIDEO );
+	#ifdef ENABLE_JOYSTICKCODE
+	SDL_Init(SDL_INIT_VIDEO | SDL_INIT_JOYSTICK);
+	
+	if (SDL_NumJoysticks() > 0)
+	{
+		sdl_joy = SDL_JoystickOpen(0);
+		SDL_JoystickEventState(SDL_ENABLE);
+	}
+	#else
+	SDL_Init(SDL_INIT_VIDEO);
+	#endif
 	
 	SDL_ShowCursor(0);
 	
-	sdl_screen = SDL_SetVideoMode(HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, SDL_HWSURFACE);
+	sdl_screen = SDL_SetVideoMode(HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, FLAGS_SDL);
 	
 	backbuffer = SDL_CreateRGBSurface(SDL_SWSURFACE, HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, 0,0,0,0);
 	
 	wswan_vs = SDL_CreateRGBSurface(SDL_SWSURFACE, INTERNAL_WSWAN_WIDTH, INTERNAL_WSWAN_HEIGHT, 16, 0,0,0,0);
-	
-	wswan_vs_rot = SDL_CreateRGBSurface(SDL_SWSURFACE, INTERNAL_WSWAN_HEIGHT, INTERNAL_WSWAN_WIDTH, 16, 0,0,0,0);
+
+	aspect_ratio_hw = get_keep_aspect_ratio();
 
 	Set_Video_InGame();
 }
 
 void Set_Video_Menu()
 {
-	if (sdl_screen->w != HOST_WIDTH_RESOLUTION)
-	{
-		//memcpy(wswan_vs->pixels, sdl_screen->pixels, (INTERNAL_WSWAN_WIDTH * INTERNAL_WSWAN_HEIGHT)*2);
-		sdl_screen = SDL_SetVideoMode(HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, SDL_HWSURFACE);
-	}
+	/* Fix mismatches when adjusting IPU ingame */
+	if (get_keep_aspect_ratio() == 1 && option.fullscreen == 0) option.fullscreen = 1;
+	else if (get_keep_aspect_ratio() == 0 && option.fullscreen == 1) option.fullscreen = 0;
+	
+	sdl_screen = SDL_SetVideoMode(HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, FLAGS_SDL);
 }
 
 void Set_Video_InGame()
 {
 	if ((Wswan_IsVertical() == 1 && option.orientation_settings != 2) || option.orientation_settings == 1)
 	{
-		sdl_screen = SDL_SetVideoMode(INTERNAL_WSWAN_HEIGHT, INTERNAL_WSWAN_WIDTH, 16, SDL_HWSURFACE);
+		sdl_screen = SDL_SetVideoMode(INTERNAL_WSWAN_HEIGHT, INTERNAL_WSWAN_WIDTH, 16, FLAGS_SDL);
 		Draw_to_Virtual_Screen = wswan_vs->pixels;
 		width_of_surface = wswan_vs->w;
 	}
 	else
 	{
-		sdl_screen = SDL_SetVideoMode(INTERNAL_WSWAN_WIDTH, INTERNAL_WSWAN_HEIGHT, 16, SDL_HWSURFACE);
-		Draw_to_Virtual_Screen = wswan_vs->pixels;
-		width_of_surface = wswan_vs->w;
+		sdl_screen = SDL_SetVideoMode(INTERNAL_WSWAN_WIDTH, INTERNAL_WSWAN_HEIGHT, 16, FLAGS_SDL);
+		Draw_to_Virtual_Screen = sdl_screen->pixels;
+		width_of_surface = sdl_screen->w;
 	}
+}
+
+void Set_Video_Menu_Quit()
+{
+	set_keep_aspect_ratio(option.fullscreen);
 }
 
 void Close_Video()
 {
+	#ifdef ENABLE_JOYSTICKCODE
+	if (SDL_JoystickOpened(0)) SDL_JoystickClose(sdl_joy);
+	#endif
 	if (sdl_screen) SDL_FreeSurface(sdl_screen);
 	if (backbuffer) SDL_FreeSurface(backbuffer);
 	if (wswan_vs) SDL_FreeSurface(wswan_vs);
-	if (wswan_vs_rot) SDL_FreeSurface(wswan_vs_rot);
 	SDL_Quit();
+	
+	/* Set it back to the Default Setting when entering SwanEmu */
+	set_keep_aspect_ratio(aspect_ratio_hw);
 }
 
 void Update_Video_Menu()
@@ -125,10 +178,9 @@ void Update_Video_Ingame()
 		{
 			Set_Video_InGame();
 		}
-		SDL_LockSurface(wswan_vs_rot);
-		rotate_90_ccw((uint16_t* restrict)wswan_vs_rot->pixels, (uint16_t* restrict)wswan_vs->pixels);
-		SDL_UnlockSurface(wswan_vs_rot);	
-		SDL_BlitSurface(wswan_vs_rot, NULL, sdl_screen, NULL);
+		if (SDL_MUSTLOCK(sdl_screen)) SDL_LockSurface(sdl_screen);
+		rotate_90_ccw((uint16_t* restrict)sdl_screen->pixels, (uint16_t* restrict)wswan_vs->pixels);
+		if (SDL_MUSTLOCK(sdl_screen)) SDL_UnlockSurface(sdl_screen);
 	}
 	else
 	{
@@ -136,8 +188,7 @@ void Update_Video_Ingame()
 		{
 			Set_Video_InGame();
 		}
-		SDL_BlitSurface(wswan_vs, NULL, sdl_screen, NULL);
 	}
-	
+
 	SDL_Flip(sdl_screen);
 }
