@@ -8,6 +8,12 @@
 #include "menu.h"
 #include "config.h"
 
+#ifdef ENABLE_JOYSTICKCODE
+#define joy_commit_range 8192
+int32_t axis_input[4] = {0, 0, 0, 0};
+uint32_t axis_rotate[4] = {0, 1, 2, 3};
+#endif
+
 int32_t update_input(void)
 {
 	SDL_Event event;
@@ -15,61 +21,138 @@ int32_t update_input(void)
 	uint8_t* keys;
 	uint32_t isrotated = 0;
 
-	if (Wswan_IsVertical() == 1|| option.orientation_settings > 0)
+	if (Wswan_IsVertical() == 1 || option.orientation_settings > 0)
 	{
 		isrotated = 1;
+#ifdef ENABLE_JOYSTICKCODE
+		axis_rotate[0] = 2;
+		axis_rotate[1] = 3;
+		axis_rotate[2] = 0;
+		axis_rotate[3] = 1;
+#endif
 	}
-	
+#ifdef ENABLE_JOYSTICKCODE
+	else
+	{
+		axis_rotate[0] = 0;
+		axis_rotate[1] = 1;
+		axis_rotate[2] = 2;
+		axis_rotate[3] = 3;
+	}
+#endif
 	keys = SDL_GetKeyState(NULL);
 	
-	SDL_PollEvent(&event);
-	
-	if (keys[SDLK_RETURN] == SDL_PRESSED && keys[SDLK_ESCAPE] == SDL_PRESSED) emulator_state = 1;
+	while (SDL_PollEvent(&event))
+	{
+		switch(event.type)
+		{
+			case SDL_KEYDOWN:
+				switch(event.key.keysym.sym)
+				{
+					case SDLK_END:
+					case SDLK_RCTRL:
+						emulator_state = 1;
+					break;
+					default:
+					break;
+				}
+			break;
+			case SDL_KEYUP:
+				switch(event.key.keysym.sym)
+				{
+					case SDLK_HOME:
+						emulator_state = 1;
+					break;
+					default:
+					break;
+				}
+			break;
+			#ifdef ENABLE_JOYSTICKCODE
+			case SDL_JOYAXISMOTION:
+				if (event.jaxis.axis < 4)
+				axis_input[event.jaxis.axis] = event.jaxis.value;
+			break;
+			#endif
+		}
+	}
+
 
 	// UP -> Y1
-	if (keys[option.config_buttons[isrotated][0] ] == SDL_PRESSED)
+	if (keys[option.config_buttons[isrotated][0] ] == SDL_PRESSED
+#ifdef ENABLE_JOYSTICKCODE
+	|| axis_input[axis_rotate[1]] < -joy_commit_range
+#endif
+	)
 	{
 		button |= (1<<0);
 	}
 	
 	// RIGHT -> Y2
-	if (keys[option.config_buttons[isrotated][1] ] == SDL_PRESSED)
+	if (keys[option.config_buttons[isrotated][1] ] == SDL_PRESSED
+#ifdef ENABLE_JOYSTICKCODE
+	|| axis_input[axis_rotate[0]] > joy_commit_range
+#endif
+	)
 	{
 		button |= (1<<1);
 	}
 	
 	// DOWN -> Y3
-	if (keys[option.config_buttons[isrotated][2] ] == SDL_PRESSED)
+	if (keys[option.config_buttons[isrotated][2] ] == SDL_PRESSED
+#ifdef ENABLE_JOYSTICKCODE
+	|| axis_input[axis_rotate[1]] > joy_commit_range
+#endif
+	)
 	{
 		button |= (1<<2);
 	}
 	
 	// LEFT -> Y4
-	if (keys[option.config_buttons[isrotated][3] ] == SDL_PRESSED)
+	if (keys[option.config_buttons[isrotated][3] ] == SDL_PRESSED
+#ifdef ENABLE_JOYSTICKCODE
+	|| axis_input[axis_rotate[0]] < -joy_commit_range
+#endif
+	)
 	{
 		button |= (1<<3);
 	}
 	
 	// UP -> X1
-	if (keys[option.config_buttons[isrotated][4] ] == SDL_PRESSED)
+	if (keys[option.config_buttons[isrotated][4] ] == SDL_PRESSED
+#ifdef ENABLE_JOYSTICKCODE
+	|| axis_input[axis_rotate[3]] < -joy_commit_range
+#endif
+	)
 	{
 		button |= (1<<4);
 	}
 	
 	// RIGHT -> X2
-	if (keys[option.config_buttons[isrotated][5] ] == SDL_PRESSED)
+	if (keys[option.config_buttons[isrotated][5] ] == SDL_PRESSED
+#ifdef ENABLE_JOYSTICKCODE
+	|| axis_input[axis_rotate[2]] > joy_commit_range
+#endif
+	)
 	{
 		button |= (1<<5);
 	}
 	
 	// DOWN -> X3
-	if (keys[option.config_buttons[isrotated][6] ] == SDL_PRESSED)
+	if (keys[option.config_buttons[isrotated][6] ] == SDL_PRESSED
+#ifdef ENABLE_JOYSTICKCODE
+	|| axis_input[axis_rotate[3]] > joy_commit_range
+#endif
+	)
 	{
 		button |= (1<<6);
 	}
 	
 	// LEFT -> X4
-	if (keys[option.config_buttons[isrotated][7] ] == SDL_PRESSED)
+	if (keys[option.config_buttons[isrotated][7] ] == SDL_PRESSED
+#ifdef ENABLE_JOYSTICKCODE
+	|| axis_input[axis_rotate[2]] < -joy_commit_range
+#endif
+	)
 	{
 		button |= (1<<7);
 	}
