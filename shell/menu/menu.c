@@ -29,11 +29,17 @@ extern void SaveState(char* path, uint_fast8_t state);
 
 static uint8_t selectpressed = 0;
 static uint8_t save_slot = 0;
+
+#ifdef IPU_SCALING_NONATIVE
+static const int8_t upscalers_available = 1
+#else
 static const int8_t upscalers_available = 2
+#endif
 #ifdef SCALE2X_UPSCALER
 +1
 #endif
 ;
+
 
 static void SaveState_Menu(uint_fast8_t load_mode, uint_fast8_t slot)
 {
@@ -99,7 +105,7 @@ static void config_load()
 		option.config_buttons[1][11] = 0;
 		
 		/* Set default to keep aspect */
-		option.fullscreen = 2;
+		option.fullscreen = 1;
 	}
 }
 
@@ -389,16 +395,16 @@ void Menu()
 			switch(option.fullscreen)
 			{
 				case 0:
-					print_string("Scaling : Native", TextRed, 0, 5, 105, backbuffer->pixels);
-				break;
-				case 1:
 					print_string("Scaling : Stretched", TextRed, 0, 5, 105, backbuffer->pixels);
 				break;
-				case 2:
+				case 1:
 					print_string("Scaling : Keep scaled", TextRed, 0, 5, 105, backbuffer->pixels);
 				break;
-				case 3:
+				case 2:
 					print_string("Scaling : EPX/Scale2x", TextRed, 0, 5, 105, backbuffer->pixels);
+				break;
+				case 3:
+					print_string("Scaling : Native", TextRed, 0, 5, 105, backbuffer->pixels);
 				break;
 			}
         }
@@ -407,16 +413,16 @@ void Menu()
 			switch(option.fullscreen)
 			{
 				case 0:
-					print_string("Scaling : Native", TextWhite, 0, 5, 105, backbuffer->pixels);
-				break;
-				case 1:
 					print_string("Scaling : Stretched", TextWhite, 0, 5, 105, backbuffer->pixels);
 				break;
-				case 2:
+				case 1:
 					print_string("Scaling : Keep scaled", TextWhite, 0, 5, 105, backbuffer->pixels);
 				break;
-				case 3:
+				case 2:
 					print_string("Scaling : EPX/Scale2x", TextWhite, 0, 5, 105, backbuffer->pixels);
+				break;
+				case 3:
+					print_string("Scaling : Native", TextWhite, 0, 5, 105, backbuffer->pixels);
 				break;
 			}
         }
@@ -564,15 +570,18 @@ void Menu()
     SDL_FillRect(sdl_screen, NULL, 0);
     SDL_Flip(sdl_screen);
     #endif
-    
+
     if (currentselection == 7)
     {
+		config_save();
         done = 1;
 	}
 	
 	/* Switch back to emulator core */
 	emulator_state = 0;
 	Set_Video_InGame();
+    
+    Set_Video_Menu_Quit();
 }
 
 static void Cleanup(void)
