@@ -109,7 +109,6 @@ void Update_Video_Menu()
 
 void Set_Video_Menu_Quit()
 {
-	set_keep_aspect_ratio(option.fullscreen);
 }
 
 static void rotate_90_ccw(uint16_t* restrict dst, uint16_t* restrict src)
