@@ -489,11 +489,13 @@ void Menu()
                             case 3:
                                 if (save_slot > 0) save_slot--;
 							break;
+							#ifndef RS97
                             case 4:
 							option.fullscreen--;
 							if (option.fullscreen < 0)
 								option.fullscreen = upscalers_available;
 							break;
+							#endif
 							case 5:
 								option.orientation_settings--;
 								if (option.orientation_settings < 0)
@@ -510,11 +512,13 @@ void Menu()
 								if (save_slot == 10)
 									save_slot = 9;
 							break;
+							#ifndef RS97
                             case 4:
                                 option.fullscreen++;
                                 if (option.fullscreen > upscalers_available)
                                     option.fullscreen = 0;
 							break;
+							#endif
 							case 5:
 								option.orientation_settings++;
 								if (option.orientation_settings > 2)
@@ -522,6 +526,7 @@ void Menu()
 							break;
                         }
                         break;
+                    
 					default:
 					break;
                 }
@@ -545,11 +550,14 @@ void Menu()
 					if (option.orientation_settings > 2)
 						option.orientation_settings = 0;
 				break;
+				/* Ugly hack because you can't change IPU mode on the fly... */
+				#ifndef RS97
                 case 4 :
                     option.fullscreen++;
                     if (option.fullscreen > upscalers_available)
                         option.fullscreen = 0;
                     break;
+                #endif
                 case 2 :
                     SaveState_Menu(1, save_slot);
 					currentselection = 1;

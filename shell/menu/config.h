@@ -5,7 +5,7 @@
 #define VERTICAL_CONTROLS 1
 
 typedef struct {
-	int32_t fullscreen;
+	uint32_t fullscreen;
 	/* For input remapping */
 	uint32_t config_buttons[2][19];
 	int32_t orientation_settings;

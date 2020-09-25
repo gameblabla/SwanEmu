@@ -320,7 +320,6 @@ static void Run_Emulator(void)
 		}
 	}
 #endif
-
 }
 
 void *Get_memory_data(size_t type)
