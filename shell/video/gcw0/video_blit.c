@@ -58,11 +58,7 @@ static SDL_Joystick *sdl_joy;
 #error "GCW0 port requires IPU_SCALING_NONATIVE to be defined"
 #endif
 
-#ifdef RS97
-static const char *KEEP_ASPECT_FILENAME = "/proc/jz/ipu";
-#else
 static const char *KEEP_ASPECT_FILENAME = "/sys/devices/platform/jz-lcd.0/keep_aspect_ratio";
-#endif
 
 static inline uint_fast8_t get_keep_aspect_ratio()
 {
@@ -74,15 +70,13 @@ static inline uint_fast8_t get_keep_aspect_ratio()
 	return c == 'Y';
 }
 
-static inline void set_keep_aspect_ratio(uint_fast8_t n)
+static inline void set_keep_aspect_ratio(uint32_t n)
 {
 /* Shit isn't working and i'm not sure why. SimpleMenu's source code isn't helpful either*/
 #ifdef RS97
-	FILE *fp = fopen("/proc/jz/ipu","w");
-	if (fp)
-	{
-		fprintf(fp, n ? "1\0" : "0\0");
-		fclose(fp);
+	if (FILE *f = fopen("/proc/jz/ipu", "w")) {
+		fprintf(f, "%d", mode); // fputs(val, f);
+		fclose(f);
 	}
 #else
 	FILE *f = fopen(KEEP_ASPECT_FILENAME, "wb");
