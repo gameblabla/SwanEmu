@@ -75,13 +75,11 @@ void WSwan_writemem20(uint32_t A, uint8_t V)
 		/* WSC palettes */
 		if (offset>=0xfe00) 
 		WSwan_GfxWSCPaletteRAMWrite(offset, V);
-   }
-   /* SRAM */
-   else if (bank == 1)
-   {	 
-      if(sram_size)
-         wsSRAM[(offset | (BankSelector[1] << 16)) & (sram_size - 1)] = V;
-   }
+		return;
+	}
+	/* SRAM */
+	/* else if (bank == 1) */
+	if(sram_size) wsSRAM[(offset | (BankSelector[1] << 16)) & (sram_size - 1)] = V;
 }
 
 uint8_t WSwan_readmem20(uint32_t A)
@@ -101,32 +99,12 @@ uint8_t WSwan_readmem20(uint32_t A)
 		case 2:
 		case 3:
 			return wsCartROM[offset+((BankSelector[bank]&((rom_size>>16)-1))<<16)];
-		default: 
-		{
-			uint8_t bank_num = ((BankSelector[0] & 0xF) << 4) | (bank & 0xf);
+		default:
+			bank_num = ((BankSelector[0] & 0xF) << 4) | (bank & 0xf);
 			bank_num &= (rom_size >> 16) - 1;
 			return(wsCartROM[(bank_num << 16) | offset]);
-			uint32_t rom_addr;
-
-			if(bank == 2 || bank == 3)
-			{
-				rom_addr = offset + ((BankSelector[bank] & ((rom_size >> 16) - 1)) << 16);
-			}
-			else
-			{
-				uint8_t bank_num = (((BankSelector[0] & 0xF) << 4) | (bank & 0xf)) & ((rom_size >> 16) - 1);
-				rom_addr = (bank_num << 16) | offset; 
-			}
-
-			return wsCartROM[rom_addr];
-		}
 		break;
    }
-
-   bank_num = ((BankSelector[0] & 0xF) << 4) | (bank & 0xf);
-   bank_num &= (rom_size >> 16) - 1;
-
-   return(wsCartROM[(bank_num << 16) | offset]);
 }
 
 static void ws_CheckDMA(void)

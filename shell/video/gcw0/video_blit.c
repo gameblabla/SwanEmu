@@ -62,23 +62,21 @@ static const char *KEEP_ASPECT_FILENAME = "/sys/devices/platform/jz-lcd.0/keep_a
 
 static inline uint_fast8_t get_keep_aspect_ratio()
 {
+#ifdef RS97
+	return 0;
+#else
 	FILE *f = fopen(KEEP_ASPECT_FILENAME, "rb");
 	if (!f) return 0;
 	char c;
 	fread(&c, 1, 1, f);
 	fclose(f);
 	return c == 'Y';
+#endif
 }
 
-static inline void set_keep_aspect_ratio(uint32_t n)
+static inline void set_keep_aspect_ratio(unsigned int n)
 {
-/* Shit isn't working and i'm not sure why. SimpleMenu's source code isn't helpful either*/
-#ifdef RS97
-	if (FILE *f = fopen("/proc/jz/ipu", "w")) {
-		fprintf(f, "%d", mode); // fputs(val, f);
-		fclose(f);
-	}
-#else
+#ifndef RS97
 	FILE *f = fopen(KEEP_ASPECT_FILENAME, "wb");
 	if (!f) return;
 	char c = n ? 'Y' : 'N';
@@ -179,7 +177,6 @@ static void rotate_90_ccw(uint16_t* restrict dst, uint16_t* restrict src)
 
 void Update_Video_Ingame()
 {
-
 	if ((Wswan_IsVertical() == 1 && option.orientation_settings != 2) || option.orientation_settings == 1)
 	{
 		if (sdl_screen->w != INTERNAL_WSWAN_HEIGHT)
@@ -199,4 +196,12 @@ void Update_Video_Ingame()
 	}
 
 	SDL_Flip(sdl_screen);
+	
+	/* We can't use triple buffering because WSWAN run at a higher refresh rate (75hz) so we 
+	 * have to either use Audio I/O blocking or this solution instead.
+	 * - Still WIP though, doesn't work well with FRAMESKIP and audio */
+#ifdef FORCEWAIT
+	uint32_t start = SDL_GetTicks();
+	while ((1000/75) > SDL_GetTicks()-start) SDL_Delay((1000/75)-(SDL_GetTicks()-start));
+#endif
 }
