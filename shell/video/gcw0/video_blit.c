@@ -45,7 +45,6 @@ SDL_Surface *sdl_screen, *backbuffer, *wswan_vs;
 
 uint32_t width_of_surface;
 uint32_t* Draw_to_Virtual_Screen;
-uint_fast8_t aspect_ratio_hw = 0;
 
 /* Wonderswan games run at 75 Hz, stick with Single buffering and sync to Audio instead. */
 #define FLAGS_SDL SDL_HWSURFACE
@@ -54,36 +53,9 @@ uint_fast8_t aspect_ratio_hw = 0;
 static SDL_Joystick *sdl_joy;
 #endif
 
-#if !IPU_SCALING_NONATIVE
-#error "GCW0 port requires IPU_SCALING_NONATIVE to be defined"
+#if !IPU_SCALE
+#error "GCW0 port requires IPU_SCALE to be defined"
 #endif
-
-static const char *KEEP_ASPECT_FILENAME = "/sys/devices/platform/jz-lcd.0/keep_aspect_ratio";
-
-static inline uint_fast8_t get_keep_aspect_ratio()
-{
-#ifdef RS97
-	return 0;
-#else
-	FILE *f = fopen(KEEP_ASPECT_FILENAME, "rb");
-	if (!f) return 0;
-	char c;
-	fread(&c, 1, 1, f);
-	fclose(f);
-	return c == 'Y';
-#endif
-}
-
-static inline void set_keep_aspect_ratio(unsigned int n)
-{
-#ifndef RS97
-	FILE *f = fopen(KEEP_ASPECT_FILENAME, "wb");
-	if (!f) return;
-	char c = n ? 'Y' : 'N';
-	fwrite(&c, 1, 1, f);
-	fclose(f);
-#endif
-}
 
 void Init_Video()
 {
@@ -107,17 +79,11 @@ void Init_Video()
 	
 	wswan_vs = SDL_CreateRGBSurface(SDL_SWSURFACE, INTERNAL_WSWAN_WIDTH, INTERNAL_WSWAN_HEIGHT, 16, 0,0,0,0);
 
-	aspect_ratio_hw = get_keep_aspect_ratio();
-
 	Set_Video_InGame();
 }
 
 void Set_Video_Menu()
 {
-	/* Fix mismatches when adjusting IPU ingame */
-	if (get_keep_aspect_ratio() == 1 && option.fullscreen == 0) option.fullscreen = 1;
-	else if (get_keep_aspect_ratio() == 0 && option.fullscreen == 1) option.fullscreen = 0;
-	
 	sdl_screen = SDL_SetVideoMode(HOST_WIDTH_RESOLUTION, HOST_HEIGHT_RESOLUTION, 16, FLAGS_SDL);
 }
 
@@ -139,7 +105,6 @@ void Set_Video_InGame()
 
 void Set_Video_Menu_Quit()
 {
-	set_keep_aspect_ratio(option.fullscreen);
 }
 
 void Close_Video()
@@ -151,9 +116,6 @@ void Close_Video()
 	if (backbuffer) SDL_FreeSurface(backbuffer);
 	if (wswan_vs) SDL_FreeSurface(wswan_vs);
 	SDL_Quit();
-	
-	/* Set it back to the Default Setting when entering SwanEmu */
-	set_keep_aspect_ratio(aspect_ratio_hw);
 }
 
 void Update_Video_Menu()

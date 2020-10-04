@@ -1,15 +1,16 @@
 PRGNAME     = swanemu
-CC          = /opt/gcw0-toolchain-static/bin/mipsel-linux-gcc
+CC          = /opt/gcw0-toolchain/bin/mipsel-linux-gcc
 
 PORT = gcw0
 SOUND_ENGINE = alsa
-PROFILE		= 0
+PROFILE		= 2
+HUGE_PAGES = 1
 
 # change compilation / linking flag options
 
 INCLUDES	= -Ishell/input/sdl -Icore -Icore/sound -Ishell/menu -Ishell/video/$(PORT) -Ishell/audio -Ishell/scalers -Ishell/headers
 DEFINES		= -DLSB_FIRST -DINLINE="inline" -DWANT_16BPP -DFRONTEND_SUPPORTS_RGB565 -DSUPPORT_NATIVE_RESOLUTION
-DEFINES		+= -DALSA_SOUND -DIPU_SCALING_NONATIVE -DENABLE_JOYSTICKCODE
+DEFINES		+= -DALSA_SOUND -DIPU_SCALE -DENABLE_JOYSTICKCODE
 
 CFLAGS		=  $(INCLUDES) $(DEFINES)
 CFLAGS		+= -std=gnu99 
@@ -31,6 +32,10 @@ ifeq ($(PROFILE), 1)
 LDFLAGS 	+= -lgcov
 endif
 
+ifeq ($(HUGE_PAGES), 1)
+LDFLAGS		+= -Wl,-zcommon-page-size=2097152 -Wl,-zmax-page-size=2097152 -lhugetlbfs
+endif
+
 # Files to be compiled
 SRCDIR 		= ./core ./core/sound ./core/wswan
 SRCDIR 		+= ./shell/video/$(PORT) ./shell/audio/$(SOUND_ENGINE) ./shell/input/sdl ./shell/menu ./shell/emu ./shell/scalers
@@ -42,6 +47,9 @@ OBJS		= $(OBJ_C)
 # Rules to make executable
 $(PRGNAME): $(OBJS)  
 	$(CC) $(CFLAGS) -o $(PRGNAME) $^ $(LDFLAGS)
+ifeq ($(HUGE_PAGES), 1)
+	hugeedit --text --data $(PRGNAME)
+endif
 	
 $(OBJ_C) : %.o : %.c
 	$(CC) $(CFLAGS) -c -o $@ $<

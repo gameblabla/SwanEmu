@@ -75,7 +75,10 @@ int32_t update_input(void)
 			#endif
 		}
 	}
-
+	
+	#ifdef GKD350H
+	if (keys[SDLK_RETURN] && keys[SDLK_ESCAPE]) emulator_state = 1;
+	#endif
 
 	// UP -> Y1
 	if (keys[option.config_buttons[isrotated][0] ] == SDL_PRESSED

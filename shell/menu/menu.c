@@ -30,16 +30,19 @@ extern void SaveState(char* path, uint_fast8_t state);
 static uint8_t selectpressed = 0;
 static uint8_t save_slot = 0;
 
-#ifdef IPU_SCALING_NONATIVE
-static const int8_t upscalers_available = 1
+#ifdef IPU_SCALE
+#define IPU_SCALE_OFFSET 1
+#define IPU_SCALE_OFFSET_Y 20
 #else
-static const int8_t upscalers_available = 2
+#define IPU_SCALE_OFFSET 0
+#define IPU_SCALE_OFFSET_Y 0
 #endif
+
+static const int8_t upscalers_available = 2
 #ifdef SCALE2X_UPSCALER
 +1
 #endif
 ;
-
 
 static void SaveState_Menu(uint_fast8_t load_mode, uint_fast8_t slot)
 {
@@ -372,7 +375,7 @@ void Menu()
 	/* Save eeprom settings each time we bring up the menu */
 	EEPROM_Menu(0);
     
-    while (((currentselection != 1) && (currentselection != 7)) || (!pressed))
+    while (((currentselection != 1) && (currentselection != 7-IPU_SCALE_OFFSET)) || (!pressed))
     {
         pressed = 0;
         
@@ -393,6 +396,7 @@ void Menu()
 		if (currentselection == 3) print_string(text, TextRed, 0, 5, 85, backbuffer->pixels);
 		else print_string(text, TextWhite, 0, 5, 85, backbuffer->pixels);
 		
+		#ifndef IPU_SCALE
         if (currentselection == 4)
         {
 			switch(option.fullscreen)
@@ -429,8 +433,8 @@ void Menu()
 				break;
 			}
         }
+        #endif
 
-		
 		switch(option.orientation_settings)
 		{
 			case 0:
@@ -444,14 +448,14 @@ void Menu()
 			break;
 		}
 			
-		if (currentselection == 5) print_string(text, TextRed, 0, 5, 125, backbuffer->pixels);
-		else print_string(text, TextWhite, 0, 5, 125, backbuffer->pixels);
+		if (currentselection == 5-IPU_SCALE_OFFSET) print_string(text, TextRed, 0, 5, 125-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 125-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
 		
-		if (currentselection == 6) print_string("Input remapping", TextRed, 0, 5, 145, backbuffer->pixels);
-		else print_string("Input remapping", TextWhite, 0, 5, 145, backbuffer->pixels);
+		if (currentselection == 6-IPU_SCALE_OFFSET) print_string("Input remapping", TextRed, 0, 5, 145-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
+		else print_string("Input remapping", TextWhite, 0, 5, 145-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
 		
-		if (currentselection == 7) print_string("Quit", TextRed, 0, 5, 165, backbuffer->pixels);
-		else print_string("Quit", TextWhite, 0, 5, 165, backbuffer->pixels);
+		if (currentselection == 7-IPU_SCALE_OFFSET) print_string("Quit", TextRed, 0, 5, 165-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
+		else print_string("Quit", TextWhite, 0, 5, 165-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
 
 		print_string("Mednafen Fork by gameblabla", TextWhite, 0, 5, 205, backbuffer->pixels);
 		print_string("Credits: Ryphecha, libretro", TextWhite, 0, 5, 225, backbuffer->pixels);
@@ -465,11 +469,11 @@ void Menu()
                     case SDLK_UP:
                         currentselection--;
                         if (currentselection == 0)
-                            currentselection = 7;
+                            currentselection = 7-IPU_SCALE_OFFSET;
                         break;
                     case SDLK_DOWN:
                         currentselection++;
-                        if (currentselection == 8)
+                        if (currentselection == 8-IPU_SCALE_OFFSET)
                             currentselection = 1;
                         break;
                     case SDLK_END:
@@ -542,16 +546,15 @@ void Menu()
         {
             switch(currentselection)
             {
-				case 6:
+				case 6-IPU_SCALE_OFFSET:
 					Input_Remapping();
 				break;
-				case 5:
+				case 5-IPU_SCALE_OFFSET:
 					option.orientation_settings++;
 					if (option.orientation_settings > 2)
 						option.orientation_settings = 0;
 				break;
-				/* Ugly hack because you can't change IPU mode on the fly... */
-				#ifndef RS97
+				#ifndef IPU_SCALE
                 case 4 :
                     option.fullscreen++;
                     if (option.fullscreen > upscalers_available)
@@ -582,7 +585,7 @@ void Menu()
     SDL_Flip(sdl_screen);
     #endif
 
-    if (currentselection == 7)
+    if (currentselection == 7-IPU_SCALE_OFFSET)
     {
 		config_save();
         done = 1;
