@@ -164,12 +164,8 @@ void WSwan_SoundUpdate(void)
          period_counter[ch] -= run_time;
          while(period_counter[ch] <= 0)
          {
-            // Yay, random numbers, so let's use totally wrong numbers to make them!
-            const int bstab1[8] = { 14, 13, 12, 14, 12, 13, 14, 14 };
-            const int bstab2[8] = { 13, 12,  9, 12,  1,  1,  5, 11 };
-            //const int bstab1[8] = { 14, 13, 12, 14, 10, 9, 8, 13 };
-            //const int bstab2[8] = { 13, 12, 9, 12, 1, 6, 4, 11 };
-            nreg = (~((nreg << 1) | ( ((nreg >> bstab1[noise_control & 0x7]) & 1) ^ ((nreg >> bstab2[noise_control & 0x7]) & 1)))) & 0x7FFF;
+            static const uint8_t stab[8] = { 14, 10, 13, 4, 8, 6, 9, 11 };
+            nreg = ((nreg << 1) | ((1 ^ (nreg >> 7) ^ (nreg >> stab[noise_control & 0x7])) & 1)) & 0x7FFF;
             if(control & 0x80)
             {
                MK_SAMPLE_CACHE_NOISE;
@@ -260,11 +256,11 @@ void WSwan_SoundWrite(uint32_t A, uint8_t V)
 			sweep_8192_divider = 8192;
 		break;
 		case 0x8E:
-			noise_control = V;
 			if(V & 0x8)
 			{
-				nreg = 1;
+				nreg = 0;
 			}
+			noise_control = V & 0x17;
 		break;
 		case 0x90:
 			for(uint32_t n = 0; n < 4; n++)
@@ -361,8 +357,6 @@ void WSwan_SoundCheckRAMWrite(uint32_t A)
 
 static void RedoVolume(void)
 {
-	float eff_volume = 1.0f / 4.0f;
-
 	Blip_Synth_set_volume(&WaveSynth, 2.5, 4096);
 }
 
@@ -426,6 +420,14 @@ void WSwan_SoundSaveState(uint32_t load, FILE* fp)
 		fread(&period_counter, sizeof(uint8_t), sizeof(period_counter), fp);
 		fread(&sample_pos, sizeof(uint8_t), sizeof(sample_pos), fp);
 		fread(&nreg, sizeof(uint8_t), sizeof(nreg), fp);
+		
+		if(sweep_8192_divider < 1) sweep_8192_divider = 1;
+		for(uint_fast8_t ch = 0; ch < 4; ch++)
+		{
+			period[ch] &= 0x7FF;
+			if(period_counter[ch] < 1) period_counter[ch] = 1;
+			sample_pos[ch] &= 0x1F;
+		}
 	}
 	else
 	{
@@ -473,7 +475,7 @@ void WSwan_SoundReset(void)
 		period_counter[ch] = 1;
 	}
 	memset(sample_pos, 0, sizeof(sample_pos));
-	nreg = 1;
+	nreg = 0;
 
 	memset(sample_cache, 0, sizeof(sample_cache));
 	memset(last_val, 0, sizeof(last_val));
