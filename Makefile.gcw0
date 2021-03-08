@@ -3,7 +3,7 @@ CC          = /opt/gcw0-toolchain/bin/mipsel-linux-gcc
 
 PORT = gcw0
 SOUND_ENGINE = alsa
-PROFILE		= 2
+PROFILE		= 0
 HUGE_PAGES = 1
 
 # change compilation / linking flag options
@@ -17,10 +17,7 @@ CFLAGS		+= -std=gnu99
 
 #-fdata-sections -ffunction-sections
 CFLAGS		+= -Ofast -mno-fp-exceptions -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -march=mips32r2 -mtune=mips32r2 
-CFLAGS		+= -fno-PIC -mno-abicalls
-
-CFLAGS		+= -flto -funroll-loops -fsection-anchors
-CFLAGS		+= -fno-stack-protector -fomit-frame-pointer -falign-functions=1 -falign-jumps=1 -falign-loops=1
+CFLAGS		+= -fno-builtin -march=mips32r2 -mtune=mips32r2 -flto -fno-common -mplt -mno-shared
 ifeq ($(PROFILE), 1)
 CFLAGS 		+= -fprofile-generate=/media/data/local/home/
 else ifeq ($(PROFILE), 2)

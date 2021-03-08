@@ -1,40 +1,35 @@
 PRGNAME     = swanemu
-CC          = /opt/gcw0-toolchain-static/bin/mipsel-linux-gcc
-
-PORT = sdl
-SOUND_ENGINE = alsa
-PROFILE		= 0
+CC          = /opt/lepus-toolchain/bin/mipsel-linux-gcc
+PROFILE		= 2
 
 # change compilation / linking flag options
 
-INCLUDES	= -Ishell/input/sdl -Icore -Icore/sound -Ishell/menu -Ishell/video/$(PORT) -Ishell/audio -Ishell/scalers -Ishell/headers
+INCLUDES	= -Ishell/input/sdl -Icore -Icore/sound -Ishell/menu -Ishell/video/sdl -Ishell/audio -Ishell/scalers -Ishell/headers
 DEFINES		= -DLSB_FIRST -DINLINE="inline" -DWANT_16BPP -DFRONTEND_SUPPORTS_RGB565 -DSUPPORT_NATIVE_RESOLUTION
-DEFINES		+= -DALSA_SOUND -DIPU_SCALING_NONATIVE -DENABLE_JOYSTICKCODE -DGKD350H
+DEFINES		+= -DALSA_SOUND -DFRAMESKIP -DIPU_SCALE -DRS97
 
 CFLAGS		=  $(INCLUDES) $(DEFINES)
 CFLAGS		+= -std=gnu99 
-
-#-fdata-sections -ffunction-sections
-CFLAGS		+= -Ofast -mno-fp-exceptions -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -march=mips32r2 -mtune=mips32r2 
-CFLAGS		+= -fno-PIC -mno-abicalls
+CFLAGS		+= -Ofast -fdata-sections -ffunction-sections -mno-fp-exceptions -mno-check-zero-division -mframe-header-opt -fsingle-precision-constant -fno-common -march=mips32 -mtune=mips32 
+CFLAGS		+= -fno-PIC
 CFLAGS		+= -mlong32 -mno-micromips -mno-interlink-compressed -flto -mno-mips16
 
 CFLAGS		+= -flto -funroll-loops -fsection-anchors
 CFLAGS		+= -fno-stack-protector -fomit-frame-pointer
 ifeq ($(PROFILE), 1)
-CFLAGS 		+= -fprofile-generate=/media/roms/swanemu
+CFLAGS 		+= -fprofile-generate=/usr/local/home
 else ifeq ($(PROFILE), 2)
-CFLAGS		+= -fprofile-use -fbranch-probabilities
+CFLAGS		+= -fprofile-use
 endif
 
-LDFLAGS     =  -nodefaultlibs -lc -lm -lgcc -lasound -lSDL -Wl,--as-needed -Wl,--gc-sections -flto -fuse-linker-plugin -no-pie -s
+LDFLAGS     = -nodefaultlibs -lc -lm -lgcc -lSDL -lasound -Wl,--as-needed -Wl,--gc-sections -flto -no-pie -s
 ifeq ($(PROFILE), 1)
 LDFLAGS 	+= -lgcov
 endif
 
 # Files to be compiled
 SRCDIR 		= ./core ./core/sound ./core/wswan
-SRCDIR 		+= ./shell/video/$(PORT) ./shell/audio/$(SOUND_ENGINE) ./shell/input/sdl ./shell/menu ./shell/emu ./shell/scalers
+SRCDIR 		+= ./shell/video/gcw0 ./shell/audio/alsa ./shell/input/sdl ./shell/menu ./shell/emu ./shell/scalers
 VPATH		= $(SRCDIR)
 SRC_C		= $(foreach dir, $(SRCDIR), $(wildcard $(dir)/*.c))
 OBJ_C		= $(notdir $(patsubst %.c, %.o, $(SRC_C)))
