@@ -24,6 +24,9 @@
 #include "v30mz.h"
 #include "rtc.h"
 #include "../video.h"
+#ifdef HAVE_NEON
+#include "neon.h"
+#endif
 
 static uint32_t wsMonoPal[16][4];
 static uint32_t wsColors[8];
@@ -288,7 +291,12 @@ uint32_t wsExecuteLine(uint16_t* restrict pixels, uint8_t pitch, const uint32_t 
 		if (wsLine == 142)
 		{
 			SpriteCountCache[!FrameWhichActive] = min(0x80, SpriteCount);
-			memcpy(SpriteTable[!FrameWhichActive], &wsRAM[(SPRBase << 9) + (SpriteStart << 2)], SpriteCountCache[!FrameWhichActive] << 2);
+			#ifdef HAVE_NEON
+			neon_memcpy(
+			#else
+			memcpy(
+			#endif
+			SpriteTable[!FrameWhichActive], &wsRAM[(SPRBase << 9) + (SpriteStart << 2)], SpriteCountCache[!FrameWhichActive] << 2);
 		}
 	}
 	

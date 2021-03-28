@@ -21,6 +21,9 @@
 #include "wswan.h"
 #include "gfx.h"
 #include "wswan-memory.h"
+#ifdef HAVE_NEON
+#include "neon.h"
+#endif
 
 uint8_t	tiles[256][256][2][8];
 uint8_t	wsTCache[512*64];
@@ -209,10 +212,18 @@ void wsGetTile(uint32_t number, uint32_t line, uint32_t flipv, uint32_t fliph, u
       }
       if(flipv)
          line=7-line;
-      if(fliph)
-         memcpy(&wsTileRow[0],&wsTCacheFlipped[(number<<6)|(line<<3)],8);
-      else
-         memcpy(&wsTileRow[0],&wsTCache[(number<<6)|(line<<3)],8);
+         
+		#ifdef HAVE_NEON
+		if(fliph)
+			neon_memcpy(&wsTileRow[0],&wsTCacheFlipped[(number<<6)|(line<<3)],8);
+		else
+			neon_memcpy(&wsTileRow[0],&wsTCache[(number<<6)|(line<<3)],8);
+		#else
+		if(fliph)
+			memcpy(&wsTileRow[0],&wsTCacheFlipped[(number<<6)|(line<<3)],8);
+		else
+			memcpy(&wsTileRow[0],&wsTCache[(number<<6)|(line<<3)],8);
+		#endif
    }
    else
    {
@@ -304,13 +315,20 @@ void wsGetTile(uint32_t number, uint32_t line, uint32_t flipv, uint32_t fliph, u
                   wsTCache2[t_index]=tiles[byte0][byte1][0][7];
                   wsTCacheFlipped2[t_index++]=tiles[byte0][byte1][1][7];
                }
-         }	
+         }
       }
-      if(flipv)
-         line=7-line;
-      if(fliph)
-         memcpy(&wsTileRow[0],&wsTCacheFlipped2[(number<<6)|(line<<3)],8);
-      else
-         memcpy(&wsTileRow[0],&wsTCache2[(number<<6)|(line<<3)],8);
+			if(flipv)
+				line=7-line;
+		#ifdef HAVE_NEON
+			if(fliph)
+				neon_memcpy(&wsTileRow[0],&wsTCacheFlipped2[(number<<6)|(line<<3)],8);
+			else
+				neon_memcpy(&wsTileRow[0],&wsTCache2[(number<<6)|(line<<3)],8);
+		#else
+			if(fliph)
+				memcpy(&wsTileRow[0],&wsTCacheFlipped2[(number<<6)|(line<<3)],8);
+			else
+				memcpy(&wsTileRow[0],&wsTCache2[(number<<6)|(line<<3)],8);
+         #endif
    }
 }
