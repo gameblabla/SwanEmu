@@ -108,7 +108,11 @@ static void config_load()
 		option.config_buttons[1][11] = 0;
 		
 		/* Set default to keep aspect */
+		#ifdef FUNKEY
+		option.fullscreen = 0;
+		#else
 		option.fullscreen = 1;
+		#endif
 	}
 }
 
@@ -132,51 +136,51 @@ static const char* Return_Text_Button(uint32_t button)
 	{
 		/* UP button */
 		case 273:
-			return "DPAD UP";
+			return "D-UP";
 		break;
 		/* DOWN button */
 		case 274:
-			return "DPAD DOWN";
+			return "D-DOWN";
 		break;
 		/* LEFT button */
 		case 276:
-			return "DPAD LEFT";
+			return "D-LEFT";
 		break;
 		/* RIGHT button */
 		case 275:
-			return "DPAD RIGHT";
+			return "D-RIGHT";
 		break;
 		/* A button */
 		case 306:
-			return "A button";
+			return "A";
 		break;
 		/* B button */
 		case 308:
-			return "B button";
+			return "B";
 		break;
 		/* X button */
 		case 304:
-			return "X button";
+			return "X";
 		break;
 		/* Y button */
 		case 32:
-			return "Y button";
+			return "Y";
 		break;
 		/* L button */
 		case 9:
-			return "L button";
+			return "L";
 		break;
 		/* R button */
 		case 8:
-			return "R button";
+			return "R";
 		break;
 		/* Power button */
 		case 279:
-			return "L2 button";
+			return "L2";
 		break;
 		/* Brightness */
 		case 51:
-			return "R2 button";
+			return "R2";
 		break;
 		/* Volume - */
 		case 38:
@@ -188,14 +192,14 @@ static const char* Return_Text_Button(uint32_t button)
 		break;
 		/* Start */
 		case 13:
-			return "Start button";
+			return "Start";
 		break;
 		/* Select */
 		case 1:
-			return "Select button";
+			return "Select";
 		break;
 		default:
-			return "Unknown key";
+			return "Unknown";
 		break;
 		case 0:
 			return "...";
@@ -277,7 +281,6 @@ static void Input_Remapping()
 					{
 						SDL_FillRect( backbuffer, NULL, 0 );
 						print_string("Please press button for mapping", TextWhite, TextBlue, 37, 108, backbuffer->pixels);
-						bitmap_scale(0,0,320,240,sdl_screen->w,sdl_screen->h,320,0,(uint16_t* restrict)backbuffer->pixels,(uint16_t* restrict)sdl_screen->pixels);
 						
 						while (SDL_PollEvent(&Event))
 						{
@@ -290,7 +293,7 @@ static void Input_Remapping()
 								}
 							}
 						}
-						SDL_Flip(sdl_screen);
+						Update_Video_Menu();
 					}
 				break;
             }
@@ -298,11 +301,11 @@ static void Input_Remapping()
         
         if (currentselection > 12) currentselection = 12;
 
-		if (controls_chosen == 0) print_string("Horizontal mode", TextWhite, 0, 100, 10, backbuffer->pixels);
-		else print_string("Vertical mode", TextWhite, 0, 100, 10, backbuffer->pixels);
+		if (controls_chosen == 0) print_string("Horizontal mode", TextWhite, 0, 5, 10, backbuffer->pixels);
+		else print_string("Vertical mode", TextWhite, 0, 5, 10, backbuffer->pixels);
 		
-		print_string("Press [A] to map to a button", TextWhite, TextBlue, 50, 210, backbuffer->pixels);
-		print_string("Press [B] to Exit", TextWhite, TextBlue, 85, 225, backbuffer->pixels);
+		print_string("Press [A] to map to a button", TextWhite, TextBlue, 5, 210, backbuffer->pixels);
+		print_string("Press [B] to Exit", TextWhite, TextBlue, 5, 225, backbuffer->pixels);
 		
 		snprintf(text, sizeof(text), "Y1   : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][0]));
 		if (currentselection == 1) print_string(text, TextRed, 0, 5, 25+2, backbuffer->pixels);
@@ -341,19 +344,18 @@ static void Input_Remapping()
 		else print_string(text, TextWhite, 0, 5, 185+2, backbuffer->pixels);
 			
 		snprintf(text, sizeof(text), "START: %s\n", Return_Text_Button(option.config_buttons[controls_chosen][9]));
-		if (currentselection == 10) print_string(text, TextRed, 0, 165, 25+2, backbuffer->pixels);
-		else print_string(text, TextWhite, 0, 165, 25+2, backbuffer->pixels);
+		if (currentselection == 10) print_string(text, TextRed, 0, 135, 25+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 135, 25+2, backbuffer->pixels);
 			
 		snprintf(text, sizeof(text), "A    : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][10]));
-		if (currentselection == 11) print_string(text, TextRed, 0, 165, 45+2, backbuffer->pixels);
-		else print_string(text, TextWhite, 0, 165, 45+2, backbuffer->pixels);
+		if (currentselection == 11) print_string(text, TextRed, 0, 135, 45+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 135, 45+2, backbuffer->pixels);
 			
 		snprintf(text, sizeof(text), "B    : %s\n", Return_Text_Button(option.config_buttons[controls_chosen][11]));
-		if (currentselection == 12) print_string(text, TextRed, 0, 165, 65+2, backbuffer->pixels);
-		else print_string(text, TextWhite, 0, 165, 65+2, backbuffer->pixels);
+		if (currentselection == 12) print_string(text, TextRed, 0, 135, 65+2, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 135, 65+2, backbuffer->pixels);
 		
-		bitmap_scale(0,0,320,240,sdl_screen->w,sdl_screen->h,320,0,(uint16_t* restrict)backbuffer->pixels,(uint16_t* restrict)sdl_screen->pixels);
-		SDL_Flip(sdl_screen);
+		Update_Video_Menu();
 	}
 	
 	config_save();
@@ -381,20 +383,21 @@ void Menu()
         
         SDL_FillRect( backbuffer, NULL, 0 );
 
-		print_string("SwanEmu - Built on " __DATE__, TextWhite, 0, 5, 15, backbuffer->pixels);
+		print_string("SwanEmu", TextWhite, 0, 5, 5, backbuffer->pixels);
+		print_string("Built on " __DATE__, TextWhite, 0, 5, 25, backbuffer->pixels);
 		
-		if (currentselection == 1) print_string("Continue", TextRed, 0, 5, 45, backbuffer->pixels);
-		else  print_string("Continue", TextWhite, 0, 5, 45, backbuffer->pixels);
+		if (currentselection == 1) print_string("Continue", TextRed, 0, 5, 65, backbuffer->pixels);
+		else  print_string("Continue", TextWhite, 0, 5, 65, backbuffer->pixels);
 		
 		snprintf(text, sizeof(text), "Load State %d", save_slot);
 		
-		if (currentselection == 2) print_string(text, TextRed, 0, 5, 65, backbuffer->pixels);
-		else print_string(text, TextWhite, 0, 5, 65, backbuffer->pixels);
+		if (currentselection == 2) print_string(text, TextRed, 0, 5, 85, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 85, backbuffer->pixels);
 		
 		snprintf(text, sizeof(text), "Save State %d", save_slot);
 		
-		if (currentselection == 3) print_string(text, TextRed, 0, 5, 85, backbuffer->pixels);
-		else print_string(text, TextWhite, 0, 5, 85, backbuffer->pixels);
+		if (currentselection == 3) print_string(text, TextRed, 0, 5, 105, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 105, backbuffer->pixels);
 		
 		#ifndef IPU_SCALE
         if (currentselection == 4)
@@ -402,16 +405,16 @@ void Menu()
 			switch(option.fullscreen)
 			{
 				case 0:
-					print_string("Scaling : Stretched", TextRed, 0, 5, 105, backbuffer->pixels);
+					print_string("Scaling : Stretched", TextRed, 0, 5, 125, backbuffer->pixels);
 				break;
 				case 1:
-					print_string("Scaling : Keep scaled", TextRed, 0, 5, 105, backbuffer->pixels);
+					print_string("Scaling : Keep scaled", TextRed, 0, 5, 125, backbuffer->pixels);
 				break;
 				case 2:
-					print_string("Scaling : EPX/Scale2x", TextRed, 0, 5, 105, backbuffer->pixels);
+					print_string("Scaling : Native", TextRed, 0, 5, 125, backbuffer->pixels);
 				break;
 				case 3:
-					print_string("Scaling : Native", TextRed, 0, 5, 105, backbuffer->pixels);
+					print_string("Scaling : EPX/Scale2x", TextRed, 0, 5, 125, backbuffer->pixels);
 				break;
 			}
         }
@@ -420,16 +423,16 @@ void Menu()
 			switch(option.fullscreen)
 			{
 				case 0:
-					print_string("Scaling : Stretched", TextWhite, 0, 5, 105, backbuffer->pixels);
+					print_string("Scaling : Stretched", TextWhite, 0, 5, 125, backbuffer->pixels);
 				break;
 				case 1:
-					print_string("Scaling : Keep scaled", TextWhite, 0, 5, 105, backbuffer->pixels);
+					print_string("Scaling : Keep scaled", TextWhite, 0, 5, 125, backbuffer->pixels);
 				break;
 				case 2:
-					print_string("Scaling : EPX/Scale2x", TextWhite, 0, 5, 105, backbuffer->pixels);
+					print_string("Scaling : Native", TextWhite, 0, 5, 125, backbuffer->pixels);
 				break;
 				case 3:
-					print_string("Scaling : Native", TextWhite, 0, 5, 105, backbuffer->pixels);
+					print_string("Scaling : EPX/Scale2x", TextWhite, 0, 5, 125, backbuffer->pixels);
 				break;
 			}
         }
@@ -444,18 +447,23 @@ void Menu()
 				snprintf(text, sizeof(text), "Orientation : Vertical");
 			break;
 			case 2:
+				// TODO: FIX THIS
+				#ifdef FUNKEY
+				snprintf(text, sizeof(text), "Orientation : No ROT/INV");
+				#else
 				snprintf(text, sizeof(text), "Orientation : No rotate/No invert");
+				#endif
 			break;
 		}
 			
-		if (currentselection == 5-IPU_SCALE_OFFSET) print_string(text, TextRed, 0, 5, 125-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
-		else print_string(text, TextWhite, 0, 5, 125-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
+		if (currentselection == 5-IPU_SCALE_OFFSET) print_string(text, TextRed, 0, 5, 145-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
+		else print_string(text, TextWhite, 0, 5, 145-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
 		
-		if (currentselection == 6-IPU_SCALE_OFFSET) print_string("Input remapping", TextRed, 0, 5, 145-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
-		else print_string("Input remapping", TextWhite, 0, 5, 145-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
+		if (currentselection == 6-IPU_SCALE_OFFSET) print_string("Input remapping", TextRed, 0, 5, 165-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
+		else print_string("Input remapping", TextWhite, 0, 5, 165-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
 		
-		if (currentselection == 7-IPU_SCALE_OFFSET) print_string("Quit", TextRed, 0, 5, 165-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
-		else print_string("Quit", TextWhite, 0, 5, 165-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
+		if (currentselection == 7-IPU_SCALE_OFFSET) print_string("Quit", TextRed, 0, 5, 185-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
+		else print_string("Quit", TextWhite, 0, 5, 185-IPU_SCALE_OFFSET_Y, backbuffer->pixels);
 
 		print_string("Mednafen Fork by gameblabla", TextWhite, 0, 5, 205, backbuffer->pixels);
 		print_string("Credits: Ryphecha, libretro", TextWhite, 0, 5, 225, backbuffer->pixels);
@@ -493,14 +501,14 @@ void Menu()
                             case 3:
                                 if (save_slot > 0) save_slot--;
 							break;
-							#ifndef RS97
+							#ifndef IPU_SCALE
                             case 4:
 							option.fullscreen--;
 							if (option.fullscreen < 0)
 								option.fullscreen = upscalers_available;
 							break;
 							#endif
-							case 5:
+							case 5-IPU_SCALE_OFFSET:
 								option.orientation_settings--;
 								if (option.orientation_settings < 0)
 									option.orientation_settings = 2;
@@ -516,14 +524,14 @@ void Menu()
 								if (save_slot == 10)
 									save_slot = 9;
 							break;
-							#ifndef RS97
+							#ifndef IPU_SCALE
                             case 4:
                                 option.fullscreen++;
                                 if (option.fullscreen > upscalers_available)
                                     option.fullscreen = 0;
 							break;
 							#endif
-							case 5:
+							case 5-IPU_SCALE_OFFSET:
 								option.orientation_settings++;
 								if (option.orientation_settings > 2)
 									option.orientation_settings = 0;
@@ -574,8 +582,7 @@ void Menu()
             }
         }
 
-		bitmap_scale(0,0,320,240,sdl_screen->w,sdl_screen->h,320,0,(uint16_t* restrict)backbuffer->pixels,(uint16_t* restrict)sdl_screen->pixels);
-		SDL_Flip(sdl_screen);
+		Update_Video_Menu();
     }
     
     SDL_FillRect(sdl_screen, NULL, 0);

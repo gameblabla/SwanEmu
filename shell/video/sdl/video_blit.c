@@ -104,6 +104,7 @@ void Close_Video()
 
 void Update_Video_Menu()
 {
+	SDL_SoftStretch(backbuffer, NULL, sdl_screen, NULL);
 	SDL_Flip(sdl_screen);
 }
 
@@ -163,11 +164,8 @@ void Update_Video_Ingame()
 		case 1:
 			bitmap_scale(0,0,internal_width,internal_height,keep_aspect_width,keep_aspect_height,internal_width, HOST_WIDTH_RESOLUTION - keep_aspect_width,(uint16_t* restrict)source_graph,(uint16_t* restrict)sdl_screen->pixels+(HOST_WIDTH_RESOLUTION-keep_aspect_width)/2+(HOST_HEIGHT_RESOLUTION-keep_aspect_height)/2*HOST_WIDTH_RESOLUTION);
 		break;
-		// Hqx
-		case 2:
-		break;
 		#ifndef SUPPORT_NATIVE_RESOLUTION
-		case 3:
+		case 2:
 			pitch = HOST_WIDTH_RESOLUTION;
 			src = (uint16_t* restrict)source_graph;
 			dst = (uint16_t* restrict)sdl_screen->pixels
@@ -181,6 +179,9 @@ void Update_Video_Ingame()
 			}
 		break;
 		#endif
+		// Hqx
+		case 3:
+		break;
 	}
 	SDL_UnlockSurface(sdl_screen);	
 	SDL_Flip(sdl_screen);

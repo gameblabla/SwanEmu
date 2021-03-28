@@ -37,7 +37,7 @@ uint32_t Audio_Init()
 	}
 	
 #ifdef FORCEWAIT
-	snd_pcm_nonblock(handle, 1);
+	snd_pcm_nonblock(handle, 0);
 #endif
 
 	/* Allocate a hardware parameters object. */

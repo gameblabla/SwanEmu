@@ -120,6 +120,7 @@ void Close_Video()
 
 void Update_Video_Menu()
 {
+	bitmap_scale(0,0,320,240,sdl_screen->w,sdl_screen->h,320,0,(uint16_t* restrict)backbuffer->pixels,(uint16_t* restrict)sdl_screen->pixels);
 	SDL_Flip(sdl_screen);
 }
 
@@ -162,7 +163,7 @@ void Update_Video_Ingame()
 	/* We can't use triple buffering because WSWAN run at a higher refresh rate (75hz) so we 
 	 * have to either use Audio I/O blocking or this solution instead.
 	 * - Still WIP though, doesn't work well with FRAMESKIP and audio */
-#ifdef FORCEWAIT
+#ifdef FORCEWAIT_VIDEO
 	uint32_t start = SDL_GetTicks();
 	while ((1000/75) > SDL_GetTicks()-start) SDL_Delay((1000/75)-(SDL_GetTicks()-start));
 #endif
